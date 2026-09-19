@@ -108,10 +108,10 @@ export const LayerPodium3D: React.FC<LayerPodium3DProps> = ({
             {/* Operator Info & Large Productivity Number */}
             <div className="w-full my-auto flex flex-col items-center">
               <span className="text-[14px] font-extrabold text-slate-900 tracking-wide uppercase line-clamp-1 max-w-[200px] drop-shadow-xs">
-                {secondPlace?.name || 'GABRIEL YGOR'}
+                {secondPlace?.name || '—'}
               </span>
               <div className="text-[38px] font-black text-slate-950 tracking-tight leading-none mt-1 font-heading">
-                {formatNumber(secondPlace?.totalProductivity ?? 4982)}
+                {formatNumber(secondPlace?.totalProductivity ?? 0)}
               </div>
               <span className="text-[11px] font-semibold text-slate-700 mt-1 uppercase tracking-wider">
                 Total de Produtividade
@@ -124,7 +124,7 @@ export const LayerPodium3D: React.FC<LayerPodium3DProps> = ({
                 <span className="text-[9px] font-bold">2</span>
               </div>
               <span className="text-[11.5px] font-bold text-slate-900 tracking-tight">
-                {secondPlace?.movements ?? 42} Movimentações
+                {secondPlace?.movements ?? 0} Movimentações
               </span>
             </div>
 
@@ -190,10 +190,10 @@ export const LayerPodium3D: React.FC<LayerPodium3DProps> = ({
             {/* Operator Info & Large Productivity Number */}
             <div className="w-full my-auto flex flex-col items-center">
               <span className="text-[15.5px] font-black text-amber-950 tracking-wide uppercase line-clamp-1 max-w-[220px] drop-shadow-xs">
-                {firstPlace?.name || 'LUAN MARTINS'}
+                {firstPlace?.name || '—'}
               </span>
               <div className="text-[44px] font-black text-amber-950 tracking-tight leading-none mt-1 font-heading drop-shadow-sm">
-                {formatNumber(firstPlace?.totalProductivity ?? 5234)}
+                {formatNumber(firstPlace?.totalProductivity ?? 0)}
               </div>
               <span className="text-[11.5px] font-extrabold text-amber-950/80 mt-1 uppercase tracking-wider">
                 Total de Produtividade
@@ -206,7 +206,7 @@ export const LayerPodium3D: React.FC<LayerPodium3DProps> = ({
                 <span className="text-[9px] font-bold">1</span>
               </div>
               <span className="text-[12px] font-extrabold text-amber-950 tracking-tight">
-                {firstPlace?.movements ?? 48} Movimentações
+                {firstPlace?.movements ?? 0} Movimentações
               </span>
             </div>
 
@@ -272,10 +272,10 @@ export const LayerPodium3D: React.FC<LayerPodium3DProps> = ({
             {/* Operator Info & Large Productivity Number */}
             <div className="w-full my-auto flex flex-col items-center">
               <span className="text-[13.5px] font-extrabold text-amber-950 tracking-wide uppercase line-clamp-1 max-w-[190px] drop-shadow-xs">
-                {thirdPlace?.name || 'MARCELINO RIBEIRO'}
+                {thirdPlace?.name || '—'}
               </span>
               <div className="text-[36px] font-black text-amber-950 tracking-tight leading-none mt-1 font-heading">
-                {formatNumber(thirdPlace?.totalProductivity ?? 4761)}
+                {formatNumber(thirdPlace?.totalProductivity ?? 0)}
               </div>
               <span className="text-[10.5px] font-semibold text-amber-950/80 mt-1 uppercase tracking-wider">
                 Total de Produtividade
@@ -288,7 +288,7 @@ export const LayerPodium3D: React.FC<LayerPodium3DProps> = ({
                 <span className="text-[9px] font-bold">3</span>
               </div>
               <span className="text-[11.5px] font-bold text-amber-950 tracking-tight">
-                {thirdPlace?.movements ?? 39} Movimentações
+                {thirdPlace?.movements ?? 0} Movimentações
               </span>
             </div>
 

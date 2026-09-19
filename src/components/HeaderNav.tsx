@@ -7,6 +7,7 @@ interface HeaderNavProps {
   onSelectPeriodPreset: (preset: PeriodPreset) => void;
   periodLabel: string;
   siteLabel: string;
+  totalOperatorsCount?: number;
   onOpenDataModal: () => void;
   activeView?: 'showcase' | 'list';
   onToggleView?: (view: 'showcase' | 'list') => void;
@@ -17,6 +18,7 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({
   onSelectPeriodPreset,
   periodLabel,
   siteLabel,
+  totalOperatorsCount = 0,
   onOpenDataModal,
   activeView = 'showcase',
   onToggleView
@@ -80,7 +82,9 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({
             </span>
           </div>
           <p className="text-[13px] font-semibold text-slate-500 mt-1 tracking-normal">
-            69 Colaboradores • Pódio 3D 4K • Navegação por Teclado (Setas ◀ ➔)
+            {totalOperatorsCount > 0
+              ? `${totalOperatorsCount} Colaboradores • Pódio 3D 4K • Navegação por Teclado (Setas ◀ ➔)`
+              : 'Aguardando Importação SAGA • Pódio 3D 4K • Firebase Realtime'}
           </p>
         </div>
       </div>

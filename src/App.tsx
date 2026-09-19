@@ -6,14 +6,9 @@ import { LayerResumoGeral } from './components/LayerResumoGeral';
 import { LayerRankingTable } from './components/LayerRankingTable';
 import { LayerCinematicShowcase } from './components/LayerCinematicShowcase';
 import { DataImportExportModal } from './components/DataImportExportModal';
-import {
-  REFERENCE_OPERATORS,
-  REFERENCE_KPIS,
-  FULL_MONTH_OPERATORS,
-  FULL_MONTH_KPIS
-} from './data/productivityData';
+import { EMPTY_OPERATORS, EMPTY_KPIS } from './data/productivityData';
 import { OperatorSummary, DashboardKPIs, PeriodPreset } from './types';
-import { ouvirRankingRealtime } from './services/firebase';
+import { ouvirRankingRealtime, carregarCacheLocal } from './services/firebase';
 
 export default function App() {
   const [periodPreset, setPeriodPreset] = useState<PeriodPreset>('reference');
@@ -23,8 +18,14 @@ export default function App() {
   const [isDataModalOpen, setIsDataModalOpen] = useState(false);
 
   // Custom data if imported by user or loaded from Firebase Realtime Database
-  const [customOperators, setCustomOperators] = useState<OperatorSummary[] | null>(null);
-  const [customLabel, setCustomLabel] = useState<string | null>(null);
+  const [customOperators, setCustomOperators] = useState<OperatorSummary[] | null>(() => {
+    const cached = carregarCacheLocal();
+    return cached ? cached.operators : null;
+  });
+  const [customLabel, setCustomLabel] = useState<string | null>(() => {
+    const cached = carregarCacheLocal();
+    return cached ? cached.label : null;
+  });
   const [isFirebaseConnected, setIsFirebaseConnected] = useState<boolean>(true);
 
   // Listen to Firebase Realtime Database in real time
@@ -67,14 +68,13 @@ export default function App() {
 
   // Compute active dataset based on preset
   const rawActiveOperators = useMemo(() => {
-    if (customOperators) return customOperators;
-    if (periodPreset === 'full') return FULL_MONTH_OPERATORS;
-    return REFERENCE_OPERATORS;
-  }, [periodPreset, customOperators]);
+    if (customOperators && customOperators.length > 0) return customOperators;
+    return EMPTY_OPERATORS;
+  }, [customOperators]);
 
   // Compute active KPIs
   const currentKPIs = useMemo<DashboardKPIs>(() => {
-    if (customOperators) {
+    if (customOperators && customOperators.length > 0) {
       const totalProd = customOperators.reduce((acc, curr) => acc + curr.totalProductivity, 0);
       const totalMov = customOperators.reduce((acc, curr) => acc + curr.movements, 0);
 
@@ -115,11 +115,8 @@ export default function App() {
       };
     }
 
-    if (periodPreset === 'full') {
-      return FULL_MONTH_KPIS;
-    }
-    return REFERENCE_KPIS;
-  }, [periodPreset, customOperators, customLabel]);
+    return EMPTY_KPIS;
+  }, [customOperators, customLabel]);
 
   // Active top 3 for the 3D podiums
   const top1 = rawActiveOperators[0];
@@ -186,6 +183,7 @@ export default function App() {
             onSelectPeriodPreset={handleSelectPeriodPreset}
             periodLabel={currentKPIs.periodLabel}
             siteLabel={currentKPIs.siteLabel}
+            totalOperatorsCount={rawActiveOperators.length}
             onOpenDataModal={() => setIsDataModalOpen(true)}
             activeView={viewMode}
             onToggleView={setViewMode}

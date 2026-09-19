@@ -26,14 +26,34 @@ export interface FirebaseRankingData {
   totalMovements: number;
 }
 
+const LOCAL_STORAGE_KEY_OPERATORS = 'saga_ranking_cached_operators';
+const LOCAL_STORAGE_KEY_LABEL = 'saga_ranking_cached_label';
+
 /**
- * Salva o ranking atual no Firebase Realtime Database
+ * Sanitiza objetos recursivamente para evitar erros no Firebase Realtime Database
+ * (Remove chaves com '/', '.', '#', '$', '[', ']' e valores undefined)
+ */
+function sanitizeForFirebase(obj: any): any {
+  if (obj === null || obj === undefined) return null;
+  if (typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) return obj.map(sanitizeForFirebase);
+
+  const clean: Record<string, any> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value === undefined) continue;
+    const safeKey = key.replace(/[\.\#\$\/\[\]]/g, '_');
+    clean[safeKey] = sanitizeForFirebase(value);
+  }
+  return clean;
+}
+
+/**
+ * Salva o ranking atual tanto no Firebase Realtime Database quanto no LocalStorage (cache imediato)
  */
 export async function salvarRankingRealtime(
   operators: OperatorSummary[],
   label: string
 ): Promise<void> {
-  const rankingRef = ref(rtdb, "ranking_atual");
   const totalProd = operators.reduce((acc, curr) => acc + curr.totalProductivity, 0);
   const totalMov = operators.reduce((acc, curr) => acc + curr.movements, 0);
 
@@ -46,11 +66,28 @@ export async function salvarRankingRealtime(
     totalMovements: totalMov
   };
 
-  await set(rankingRef, payload);
+  // 1. Salva no localStorage para carregamento instantâneo sem flicker ao recarregar
+  try {
+    localStorage.setItem(LOCAL_STORAGE_KEY_OPERATORS, JSON.stringify(operators));
+    localStorage.setItem(LOCAL_STORAGE_KEY_LABEL, label);
+  } catch (e) {
+    console.warn("Erro ao salvar no LocalStorage:", e);
+  }
+
+  // 2. Salva no Firebase Realtime Database
+  try {
+    const rankingRef = ref(rtdb, "ranking_atual");
+    const sanitized = sanitizeForFirebase(payload);
+    await set(rankingRef, sanitized);
+    console.log("[Firebase RTDB] Ranking salvo com sucesso em /ranking_atual!");
+  } catch (err) {
+    console.error("[Firebase RTDB] Falha ao salvar no Realtime Database:", err);
+    throw err;
+  }
 }
 
 /**
- * Registra o histórico completo da importação no Realtime Database
+ * Registra o histórico da importação no Realtime Database
  */
 export async function salvarHistoricoImportacao(
   fileName: string,
@@ -59,16 +96,87 @@ export async function salvarHistoricoImportacao(
   totalColaboradores: number,
   colaboradores: any[]
 ): Promise<void> {
-  const timestamp = Date.now();
-  const histRef = ref(rtdb, `historico/${timestamp}`);
-  await set(histRef, {
-    fileName,
-    timestamp: new Date().toISOString(),
-    totalPaginas,
-    totalRegistros,
-    totalColaboradores,
-    colaboradores
-  });
+  try {
+    const timestamp = Date.now();
+    const histRef = ref(rtdb, `historico/${timestamp}`);
+    const sanitized = sanitizeForFirebase({
+      fileName,
+      timestamp: new Date().toISOString(),
+      totalPaginas,
+      totalRegistros,
+      totalColaboradores,
+      colaboradores
+    });
+    await set(histRef, sanitized);
+  } catch (e) {
+    console.warn("[Firebase RTDB] Erro ao salvar histórico:", e);
+  }
+}
+
+/**
+ * Carrega os dados em cache local imediatamente ao abrir o app
+ */
+export function carregarCacheLocal(): { operators: OperatorSummary[]; label: string } | null {
+  try {
+    const raw = localStorage.getItem(LOCAL_STORAGE_KEY_OPERATORS);
+    const label = localStorage.getItem(LOCAL_STORAGE_KEY_LABEL);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return {
+          operators: parsed,
+          label: label || `SAGA (${parsed.length} Colab.)`
+        };
+      }
+    }
+  } catch (e) {
+    console.warn("Erro ao ler LocalStorage:", e);
+  }
+  return null;
+}
+
+/**
+ * Limpa todos os dados de ranking do Firebase Realtime Database e LocalStorage
+ */
+export async function limparRankingRealtime(): Promise<void> {
+  try {
+    localStorage.removeItem(LOCAL_STORAGE_KEY_OPERATORS);
+    localStorage.removeItem(LOCAL_STORAGE_KEY_LABEL);
+  } catch (e) {
+    console.warn("Erro ao limpar LocalStorage:", e);
+  }
+
+  try {
+    const rankingRef = ref(rtdb, "ranking_atual");
+    await set(rankingRef, null);
+    console.log("[Firebase RTDB] Dados limpos com sucesso!");
+  } catch (err) {
+    console.error("[Firebase RTDB] Erro ao limpar ranking no Firebase:", err);
+  }
+}
+
+/**
+ * Busca os dados atuais do Firebase uma vez de forma direta
+ */
+export async function buscarRankingRealtime(): Promise<FirebaseRankingData | null> {
+  try {
+    const rankingRef = ref(rtdb, "ranking_atual");
+    const snapshot = await get(rankingRef);
+    if (snapshot.exists()) {
+      const val = snapshot.val() as FirebaseRankingData;
+      if (val && val.operators && val.operators.length > 0) {
+        // Atualiza cache local
+        try {
+          localStorage.setItem(LOCAL_STORAGE_KEY_OPERATORS, JSON.stringify(val.operators));
+          localStorage.setItem(LOCAL_STORAGE_KEY_LABEL, val.label);
+        } catch {}
+        return val;
+      }
+    }
+  } catch (e) {
+    console.warn("[Firebase RTDB] Erro em buscarRankingRealtime:", e);
+  }
+  return null;
 }
 
 /**
@@ -80,18 +188,32 @@ export function ouvirRankingRealtime(
 ): () => void {
   const rankingRef = ref(rtdb, "ranking_atual");
 
+  // Primeira tentativa direta com get()
+  buscarRankingRealtime().then((directData) => {
+    if (directData) {
+      onData(directData);
+    }
+  });
+
   const unsubscribe = onValue(
     rankingRef,
     (snapshot) => {
       if (snapshot.exists()) {
         const val = snapshot.val() as FirebaseRankingData;
-        onData(val);
+        if (val && val.operators && val.operators.length > 0) {
+          // Atualiza cache local
+          try {
+            localStorage.setItem(LOCAL_STORAGE_KEY_OPERATORS, JSON.stringify(val.operators));
+            localStorage.setItem(LOCAL_STORAGE_KEY_LABEL, val.label);
+          } catch {}
+          onData(val);
+        }
       } else {
         onData(null);
       }
     },
     (error) => {
-      console.warn("Realtime Database listener error:", error);
+      console.warn("[Firebase RTDB] Erro no listener onValue:", error);
       onError?.(error);
     }
   );

@@ -133,6 +133,27 @@ export const LayerCinematicShowcase: React.FC<LayerCinematicShowcaseProps> = ({
 
   const maxActivityVal = activities.length > 0 ? Math.max(...activities.map((a) => a[1])) : 1;
 
+  if (totalOperators === 0) {
+    return (
+      <div className="relative w-full h-[760px] flex flex-col items-center justify-center select-none text-center px-6">
+        <div className="max-w-xl p-10 rounded-3xl bg-white/95 backdrop-blur-2xl border border-slate-200/90 shadow-2xl flex flex-col items-center">
+          <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white shadow-xl shadow-orange-600/30 mb-6">
+            <Trophy className="w-10 h-10" />
+          </div>
+          <h2 className="text-2xl font-black text-slate-900 tracking-tight font-heading mb-2">
+            NENHUM RELATÓRIO CARREGADO
+          </h2>
+          <p className="text-sm font-semibold text-slate-500 mb-6 leading-relaxed">
+            As informações de teste foram limpas. Importe o arquivo PDF oficial do Relatório de Produtividade SAGA ou aguarde a sincronização em tempo real do Firebase Realtime Database.
+          </p>
+          <div className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-amber-500 text-white font-bold text-sm shadow-lg shadow-amber-500/25">
+            <span>Clique em "Firebase Realtime / Importar" no topo</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // Calculate efficiency / percentile
   const percentile = Math.max(1, Math.round(((totalOperators - currentIndex) / totalOperators) * 100));
 

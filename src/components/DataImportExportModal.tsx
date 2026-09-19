@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { X, UploadCloud, AlertCircle, FileSpreadsheet, RefreshCw, CheckCircle2, FileText, Loader2, Database } from 'lucide-react';
 import { OperatorSummary, PeriodPreset } from '../types';
 import { lerRankingProdutividade, RankingPdfResult } from '../utils/rankingPdfParser';
-import { salvarRankingRealtime, salvarHistoricoImportacao } from '../services/firebase';
+import { salvarRankingRealtime, salvarHistoricoImportacao, limparRankingRealtime } from '../services/firebase';
 
 interface DataImportExportModalProps {
   isOpen: boolean;
@@ -26,6 +26,16 @@ export const DataImportExportModal: React.FC<DataImportExportModalProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!isOpen) return null;
+
+  const handleClearAllData = async () => {
+    try {
+      await limparRankingRealtime();
+      onImportCustomData([], "Nenhum dado importado");
+      setImportStatus("Todas as informações de teste e dados foram limpos com sucesso!");
+    } catch (e) {
+      setImportStatus("Erro ao limpar dados.");
+    }
+  };
 
   const processRankingResult = async (result: RankingPdfResult, fileName: string) => {
     // Convert RankingColaborador[] to OperatorSummary[]
@@ -347,25 +357,38 @@ export const DataImportExportModal: React.FC<DataImportExportModalProps> = ({
               </div>
             )}
 
-            <div className="flex justify-end gap-3 pt-2">
+            <div className="flex items-center justify-between pt-2">
               <button
-                onClick={() => {
-                  setPasteText('');
-                  setPdfResult(null);
-                  setImportStatus(null);
-                }}
-                className="px-4 py-2 text-xs font-bold rounded-xl text-slate-600 hover:bg-slate-100 cursor-pointer"
+                type="button"
+                onClick={handleClearAllData}
+                className="px-4 py-2 text-xs font-bold rounded-xl text-red-600 hover:bg-red-50 border border-red-200 cursor-pointer transition-colors"
+                title="Limpar todos os dados do Firebase Realtime e LocalStorage"
               >
-                Limpar
+                Limpar Banco / Resetar Dados
               </button>
-              <button
-                onClick={handleProcessImport}
-                disabled={isLoadingPdf}
-                className="px-6 py-2.5 text-xs font-bold rounded-xl bg-amber-500 hover:bg-amber-600 text-white shadow-md shadow-amber-500/30 flex items-center gap-2 cursor-pointer transition-colors disabled:opacity-50"
-              >
-                <RefreshCw className="w-3.5 h-3.5" />
-                Atualizar Dashboard com Estes Dados
-              </button>
+
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPasteText('');
+                    setPdfResult(null);
+                    setImportStatus(null);
+                  }}
+                  className="px-4 py-2 text-xs font-bold rounded-xl text-slate-600 hover:bg-slate-100 cursor-pointer"
+                >
+                  Limpar Campos
+                </button>
+                <button
+                  type="button"
+                  onClick={handleProcessImport}
+                  disabled={isLoadingPdf}
+                  className="px-6 py-2.5 text-xs font-bold rounded-xl bg-amber-500 hover:bg-amber-600 text-white shadow-md shadow-amber-500/30 flex items-center gap-2 cursor-pointer transition-colors disabled:opacity-50"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  Atualizar Dashboard com Estes Dados
+                </button>
+              </div>
             </div>
           </div>
         </div>
