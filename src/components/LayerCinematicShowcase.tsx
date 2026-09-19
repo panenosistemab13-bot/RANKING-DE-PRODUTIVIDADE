@@ -540,42 +540,49 @@ export const LayerCinematicShowcase: React.FC<LayerCinematicShowcaseProps> = ({
       </div>
 
       {/* =========================================================================
-          PARTE INFERIOR DO APP: OPÇÕES (AUTO PLAY SLIDESHOW & VER EM MODO LISTA)
+          PARTE INFERIOR DO APP: OPÇÕES (AUTO PLAY SLIDESHOW & VER EM MODO LISTA) & RODAPÉ
          ========================================================================= */}
-      <div className="w-full pb-4 pt-1 z-20 flex items-center justify-center gap-3.5 shrink-0">
-        {/* Botão AutoPlay Slideshow */}
-        <button
-          onClick={() => {
-            if (showcaseMode === 'podium') setShowcaseMode('single');
-            setIsPlaying((prev) => !prev);
-          }}
-          className={`flex items-center gap-2 px-5 py-2.5 rounded-2xl text-xs font-black tracking-wide transition-all cursor-pointer shadow-lg shadow-black/30 border ${
-            isPlaying
-              ? 'bg-red-500 hover:bg-red-600 text-white border-red-400 animate-pulse'
-              : 'bg-white hover:bg-slate-100 text-slate-900 border-white/90'
-          }`}
-        >
-          {isPlaying ? (
-            <>
-              <Pause className="w-4 h-4 text-white" />
-              <span>PAUSAR SLIDESHOW</span>
-            </>
-          ) : (
-            <>
-              <Play className="w-4 h-4 text-slate-900" />
-              <span>AUTO PLAY SLIDESHOW</span>
-            </>
-          )}
-        </button>
+      <div className="w-full pb-3 pt-1 z-20 flex flex-col items-center justify-center gap-2 shrink-0">
+        <div className="flex items-center justify-center gap-3.5">
+          {/* Botão AutoPlay Slideshow */}
+          <button
+            onClick={() => {
+              if (showcaseMode === 'podium') setShowcaseMode('single');
+              setIsPlaying((prev) => !prev);
+            }}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-2xl text-xs font-black tracking-wide transition-all cursor-pointer shadow-lg shadow-black/30 border ${
+              isPlaying
+                ? 'bg-red-500 hover:bg-red-600 text-white border-red-400 animate-pulse'
+                : 'bg-white hover:bg-slate-100 text-slate-900 border-white/90'
+            }`}
+          >
+            {isPlaying ? (
+              <>
+                <Pause className="w-4 h-4 text-white" />
+                <span>PAUSAR SLIDESHOW</span>
+              </>
+            ) : (
+              <>
+                <Play className="w-4 h-4 text-slate-900" />
+                <span>AUTO PLAY SLIDESHOW</span>
+              </>
+            )}
+          </button>
 
-        {/* Botão para Ver Modo Lista */}
-        <button
-          onClick={onSwitchToListMode}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-black tracking-wide border border-blue-400/50 shadow-lg shadow-blue-900/40 transition-all cursor-pointer group"
-        >
-          <TableProperties className="w-4 h-4 group-hover:scale-110 transition-transform" />
-          <span>VER EM MODO LISTA</span>
-        </button>
+          {/* Botão para Ver Modo Lista */}
+          <button
+            onClick={onSwitchToListMode}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-black tracking-wide border border-blue-400/50 shadow-lg shadow-blue-900/40 transition-all cursor-pointer group"
+          >
+            <TableProperties className="w-4 h-4 group-hover:scale-110 transition-transform" />
+            <span>VER EM MODO LISTA</span>
+          </button>
+        </div>
+
+        {/* Rodapé fixo na Apresentação 3D */}
+        <p className="text-[11.5px] font-medium text-slate-400/90 tracking-wider select-none">
+          criado por Jefferson Augusto 10-85447
+        </p>
       </div>
     </div>
   );
