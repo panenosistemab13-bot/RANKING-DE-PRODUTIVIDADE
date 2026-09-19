@@ -13,6 +13,7 @@ import {
   FULL_MONTH_KPIS
 } from './data/productivityData';
 import { OperatorSummary, DashboardKPIs, PeriodPreset } from './types';
+import { ouvirRankingRealtime } from './services/firebase';
 
 export default function App() {
   const [periodPreset, setPeriodPreset] = useState<PeriodPreset>('reference');
@@ -21,9 +22,31 @@ export default function App() {
   const [selectedOperator, setSelectedOperator] = useState<string | null>(null);
   const [isDataModalOpen, setIsDataModalOpen] = useState(false);
 
-  // Custom data if imported by user
+  // Custom data if imported by user or loaded from Firebase Realtime Database
   const [customOperators, setCustomOperators] = useState<OperatorSummary[] | null>(null);
   const [customLabel, setCustomLabel] = useState<string | null>(null);
+  const [isFirebaseConnected, setIsFirebaseConnected] = useState<boolean>(true);
+
+  // Listen to Firebase Realtime Database in real time
+  useEffect(() => {
+    const unsubscribe = ouvirRankingRealtime(
+      (data) => {
+        if (data && data.operators && data.operators.length > 0) {
+          console.log("[Firebase Realtime Database] Dados recebidos em tempo real:", data);
+          setCustomOperators(data.operators);
+          setCustomLabel(data.label || `SAGA (${data.operators.length} Colab.)`);
+        }
+        setIsFirebaseConnected(true);
+      },
+      (err) => {
+        console.warn("[Firebase Realtime Database] Erro de conexão:", err);
+      }
+    );
+
+    return () => {
+      unsubscribe();
+    };
+  }, []);
 
   // Viewport dimensions for proportional scaling
   const [windowSize, setWindowSize] = useState({
@@ -54,6 +77,25 @@ export default function App() {
     if (customOperators) {
       const totalProd = customOperators.reduce((acc, curr) => acc + curr.totalProductivity, 0);
       const totalMov = customOperators.reduce((acc, curr) => acc + curr.movements, 0);
+
+      // Find predominant activity across all custom operators
+      const actMap: Record<string, number> = {};
+      customOperators.forEach(op => {
+        if (op.activitiesCount) {
+          Object.entries(op.activitiesCount).forEach(([act, val]) => {
+            actMap[act] = (actMap[act] || 0) + val;
+          });
+        }
+      });
+      let bestAct = "APANHA";
+      let maxActCount = 0;
+      Object.entries(actMap).forEach(([act, count]) => {
+        if (count > maxActCount) {
+          maxActCount = count;
+          bestAct = act;
+        }
+      });
+
       return {
         totalProductivity: totalProd,
         totalOperators: customOperators.length,
@@ -67,8 +109,8 @@ export default function App() {
           name: customOperators[customOperators.length - 1]?.name || 'N/A',
           productivity: customOperators[customOperators.length - 1]?.totalProductivity || 0
         },
-        topActivity: "APANHA",
-        periodLabel: customLabel || "Personalizado",
+        topActivity: `${bestAct} (${maxActCount.toLocaleString('pt-BR')})`,
+        periodLabel: customLabel || "Relatório Importado",
         siteLabel: "3 COR - BH"
       };
     }

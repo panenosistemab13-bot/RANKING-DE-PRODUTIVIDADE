@@ -49,13 +49,6 @@ export const LayerPodium3D: React.FC<LayerPodium3DProps> = ({
       {/* Golden halo glow behind the 1º place center card */}
       <div className="absolute top-10 left-1/2 -translate-x-1/2 w-80 h-80 bg-amber-400/20 rounded-full blur-3xl pointer-events-none animate-pulse" style={{ animationDuration: '4s' }} />
 
-      {/* Top Banner Tag: PÓDIO DOS CAMPEÕES EM DESTAQUE */}
-      <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 flex items-center gap-2 px-5 py-1.5 rounded-full bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 text-amber-950 font-black text-[11px] tracking-widest uppercase shadow-xl shadow-amber-500/35 border border-white/90 z-20">
-        <span className="text-sm">👑</span>
-        <span>PÓDIO DE LÍDERES • TOP 3 EM DESTAQUE</span>
-        <span className="text-xs text-amber-900">✨</span>
-      </div>
-
       {/* Reflective stage pedestal under the entire podium set */}
       <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[760px] h-[28px] bg-gradient-to-r from-transparent via-amber-400/30 to-transparent rounded-full blur-lg pointer-events-none" />
       <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-[700px] h-[32px] bg-slate-900/15 rounded-full blur-xl pointer-events-none" />

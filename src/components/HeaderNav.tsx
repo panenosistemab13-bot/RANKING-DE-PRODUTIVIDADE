@@ -87,35 +87,6 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({
 
       {/* Right Badges & Controls */}
       <div className="flex items-center gap-3.5">
-        {/* VIEW MODE TOGGLE (Apresentação 3D 4K vs Modo Lista) */}
-        {onToggleView && (
-          <div className="flex items-center p-1 rounded-2xl bg-white/90 border border-slate-200/90 shadow-sm backdrop-blur-md">
-            <button
-              onClick={() => onToggleView('showcase')}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
-                activeView === 'showcase'
-                  ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-white shadow-md shadow-amber-500/25'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-              }`}
-            >
-              <Trophy className="w-3.5 h-3.5" />
-              <span>APRESENTAÇÃO 3D (TECLADO ➔)</span>
-            </button>
-
-            <button
-              onClick={() => onToggleView('list')}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
-                activeView === 'list'
-                  ? 'bg-gradient-to-r from-blue-600 to-indigo-700 text-white shadow-md shadow-blue-600/25'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-              }`}
-            >
-              <TableProperties className="w-3.5 h-3.5" />
-              <span>MODO LISTA</span>
-            </button>
-          </div>
-        )}
-
         {/* Período Pill Selector */}
         <div className="relative">
           <button
@@ -199,6 +170,28 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({
           </div>
         </div>
 
+        {/* Botão de Banco de Dados / Firebase */}
+        <button
+          onClick={onOpenDataModal}
+          title="Banco de Dados Firebase Realtime • Importar PDF"
+          className="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-900 border border-amber-300/80 shadow-xs hover:shadow-md transition-all duration-200 cursor-pointer group"
+        >
+          <div className="w-7 h-7 rounded-xl bg-amber-500 flex items-center justify-center text-white shadow-xs group-hover:scale-105 transition-transform">
+            <SlidersHorizontal className="w-3.5 h-3.5" />
+          </div>
+          <div className="text-left leading-tight hidden lg:block">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11.5px] font-black text-amber-900 tracking-tight uppercase font-heading">
+                Firebase Realtime
+              </span>
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            </div>
+            <span className="block text-[9.5px] font-bold text-amber-700 uppercase tracking-wider">
+              Importar / Sincronizar
+            </span>
+          </div>
+        </button>
+
         {/* Slogan with Heart Logo */}
         <div className="flex items-center gap-2.5 pl-2 select-none">
           <span className="text-[13.5px] font-serif italic font-bold text-slate-800 tracking-tight leading-snug text-right max-w-[135px]">
@@ -211,24 +204,37 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({
           </div>
         </div>
 
-        {/* Botão e Indicador de Modo Tela Cheia */}
-        <div className="flex items-center gap-2 pl-2 border-l border-slate-200/70">
+        {/* Botão e Indicador de Modo Tela Cheia — Design Executivo e Elegante */}
+        <div className="flex items-center gap-2 pl-2 border-l border-slate-200/80">
           <button
             onClick={toggleFullscreen}
-            title="Alternar Tela Cheia (Apresentação / TV)"
-            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-800 text-[11px] font-black uppercase tracking-wider shadow-xs transition-all cursor-pointer group"
+            title={isFullscreen ? "Sair da Tela Cheia (Esc)" : "Entrar em Tela Cheia (F11 / Apresentação)"}
+            className="flex items-center gap-3 px-3.5 py-1.5 rounded-2xl bg-white/95 hover:bg-white border border-slate-200/90 hover:border-amber-400/80 shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer group text-slate-800"
           >
-            <span className="relative flex h-2.5 w-2.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
-            </span>
-            <Monitor className="w-3.5 h-3.5 text-amber-700 group-hover:scale-110 transition-transform" />
-            <span>{isFullscreen ? 'SAIR DA TELA CHEIA' : 'TELA CHEIA (APRESENTAÇÃO)'}</span>
-            {isFullscreen ? (
-              <Minimize className="w-3 h-3 text-amber-700 ml-0.5" />
-            ) : (
-              <Maximize className="w-3 h-3 text-amber-700 ml-0.5" />
-            )}
+            <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center text-white shadow-xs group-hover:scale-105 transition-transform">
+              <Monitor className="w-3.5 h-3.5 text-white" />
+            </div>
+            <div className="text-left leading-tight pr-1">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[12px] font-black text-slate-800 tracking-tight uppercase font-heading">
+                  {isFullscreen ? 'Sair da Tela Cheia' : 'Modo Tela Cheia'}
+                </span>
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+              </div>
+              <span className="block text-[10px] font-bold text-amber-700/90 uppercase tracking-wider">
+                {isFullscreen ? 'Pressione Esc' : 'Apresentação TV'}
+              </span>
+            </div>
+            <div className="w-6 h-6 rounded-lg bg-slate-100/80 group-hover:bg-amber-100 group-hover:text-amber-800 flex items-center justify-center text-slate-500 transition-colors ml-0.5">
+              {isFullscreen ? (
+                <Minimize className="w-3.5 h-3.5" />
+              ) : (
+                <Maximize className="w-3.5 h-3.5" />
+              )}
+            </div>
           </button>
         </div>
       </div>

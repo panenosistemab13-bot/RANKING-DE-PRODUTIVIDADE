@@ -178,7 +178,7 @@ export const LayerCinematicShowcase: React.FC<LayerCinematicShowcaseProps> = ({
             }`}
           >
             <Users className="w-4 h-4" />
-            <span>CARROSSEL 1 A 1 (TODOS OS 69)</span>
+            <span>CARROSSEL 1 A 1 (TODOS OS {totalOperators})</span>
           </button>
         </div>
       </div>

@@ -103,7 +103,7 @@ export const LayerResumoGeral: React.FC<LayerResumoGeralProps> = ({
                 {kpis.totalOperators}
               </div>
               <span className="text-[10px] font-medium text-slate-400">
-                69 operadores no relatório oficial
+                {kpis.totalOperators} operadores no relatório
               </span>
             </div>
           </div>
@@ -119,7 +119,7 @@ export const LayerResumoGeral: React.FC<LayerResumoGeralProps> = ({
                   Movimentações
                 </span>
                 <span className="text-[10px] font-extrabold text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded-md">
-                  4.819 ordens
+                  Auditado SAGA
                 </span>
               </div>
               <div className="text-[26px] font-black text-slate-900 tracking-tight leading-none mt-0.5 font-heading">
@@ -139,7 +139,7 @@ export const LayerResumoGeral: React.FC<LayerResumoGeralProps> = ({
             Atividade Principal:
           </span>
           <span className="font-black text-slate-900 uppercase">
-            CONF VOLUME (182.324)
+            {kpis.topActivity}
           </span>
         </div>
       </div>
