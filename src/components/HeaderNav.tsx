@@ -1,0 +1,238 @@
+import React, { useState, useEffect } from 'react';
+import { Calendar, MapPin, SlidersHorizontal, Monitor, Trophy, TableProperties, Maximize, Minimize } from 'lucide-react';
+import { PeriodPreset } from '../types';
+
+interface HeaderNavProps {
+  periodPreset: PeriodPreset;
+  onSelectPeriodPreset: (preset: PeriodPreset) => void;
+  periodLabel: string;
+  siteLabel: string;
+  onOpenDataModal: () => void;
+  activeView?: 'showcase' | 'list';
+  onToggleView?: (view: 'showcase' | 'list') => void;
+}
+
+export const HeaderNav: React.FC<HeaderNavProps> = ({
+  periodPreset,
+  onSelectPeriodPreset,
+  periodLabel,
+  siteLabel,
+  onOpenDataModal,
+  activeView = 'showcase',
+  onToggleView
+}) => {
+  const [showPeriodDropdown, setShowPeriodDropdown] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
+  const toggleFullscreen = () => {
+    try {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      } else {
+        if (document.exitFullscreen) {
+          document.exitFullscreen().catch(() => {});
+        }
+      }
+    } catch {
+      // safe fallback if iframe blocks
+    }
+  };
+
+  return (
+    <header className="w-full flex items-center justify-between px-8 pt-5 pb-2 z-20 shrink-0">
+      {/* Esquerda: Logo 3 Corações + Título do Dashboard */}
+      <div className="flex items-center gap-5">
+        {/* Logo Oficial 3 Corações */}
+        <div className="flex items-center gap-3 pr-5 border-r border-slate-300/70">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-500 via-orange-600 to-red-600 flex items-center justify-center text-white shadow-xl shadow-orange-600/30 border border-white/70 relative">
+            <svg viewBox="0 0 24 24" className="w-7 h-7 fill-white drop-shadow-sm">
+              <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+            </svg>
+            <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-amber-400 border-2 border-white flex items-center justify-center text-[10px] font-black text-slate-900 shadow-xs">
+              3
+            </div>
+          </div>
+          <div>
+            <span className="block text-[16px] font-black text-slate-900 leading-tight tracking-tight font-heading">
+              3 CORAÇÕES
+            </span>
+            <span className="text-[10px] font-bold text-amber-700 tracking-wider uppercase">
+              Mais que café, relações
+            </span>
+          </div>
+        </div>
+
+        <div>
+          <div className="flex items-center gap-3">
+            <h1 className="text-[30px] font-black tracking-tight text-[#0f2444] uppercase leading-none font-heading flex items-center gap-3">
+              RANKING DE PRODUTIVIDADE
+            </h1>
+            <span className="px-2.5 py-0.5 rounded-full bg-gradient-to-r from-amber-500 to-orange-600 text-white font-black text-[10px] uppercase tracking-widest shadow-md">
+              SAGA WMS
+            </span>
+          </div>
+          <p className="text-[13px] font-semibold text-slate-500 mt-1 tracking-normal">
+            69 Colaboradores • Pódio 3D 4K • Navegação por Teclado (Setas ◀ ➔)
+          </p>
+        </div>
+      </div>
+
+      {/* Right Badges & Controls */}
+      <div className="flex items-center gap-3.5">
+        {/* VIEW MODE TOGGLE (Apresentação 3D 4K vs Modo Lista) */}
+        {onToggleView && (
+          <div className="flex items-center p-1 rounded-2xl bg-white/90 border border-slate-200/90 shadow-sm backdrop-blur-md">
+            <button
+              onClick={() => onToggleView('showcase')}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                activeView === 'showcase'
+                  ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-white shadow-md shadow-amber-500/25'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              }`}
+            >
+              <Trophy className="w-3.5 h-3.5" />
+              <span>APRESENTAÇÃO 3D (TECLADO ➔)</span>
+            </button>
+
+            <button
+              onClick={() => onToggleView('list')}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                activeView === 'list'
+                  ? 'bg-gradient-to-r from-blue-600 to-indigo-700 text-white shadow-md shadow-blue-600/25'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              }`}
+            >
+              <TableProperties className="w-3.5 h-3.5" />
+              <span>MODO LISTA</span>
+            </button>
+          </div>
+        )}
+
+        {/* Período Pill Selector */}
+        <div className="relative">
+          <button
+            onClick={() => setShowPeriodDropdown(!showPeriodDropdown)}
+            className="flex items-center gap-3 px-4 py-2 rounded-2xl bg-white/90 hover:bg-white border border-slate-200/80 shadow-sm backdrop-blur-md transition-all duration-150 cursor-pointer text-slate-800 group"
+          >
+            <div className="w-7 h-7 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600 group-hover:bg-amber-100 transition-colors">
+              <Calendar className="w-3.5 h-3.5" />
+            </div>
+            <div className="text-left leading-tight">
+              <span className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+                Período
+              </span>
+              <span className="text-[12.5px] font-bold text-slate-800 tracking-tight">
+                {periodLabel}
+              </span>
+            </div>
+          </button>
+
+          {showPeriodDropdown && (
+            <div className="absolute right-0 mt-2 w-64 rounded-2xl bg-white/95 backdrop-blur-2xl border border-slate-200/90 shadow-2xl p-2 z-50 animate-in fade-in zoom-in-95 duration-150">
+              <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                Selecione o Intervalo
+              </div>
+              <button
+                onClick={() => {
+                  onSelectPeriodPreset('reference');
+                  setShowPeriodDropdown(false);
+                }}
+                className={`w-full text-left px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center justify-between transition-colors ${
+                  periodPreset === 'reference'
+                    ? 'bg-amber-500 text-white'
+                    : 'text-slate-700 hover:bg-slate-100'
+                }`}
+              >
+                <span>Referência Oficial (01/09 - 04/09)</span>
+                {periodPreset === 'reference' && <span className="text-[10px]">★ Ativo</span>}
+              </button>
+              <button
+                onClick={() => {
+                  onSelectPeriodPreset('full');
+                  setShowPeriodDropdown(false);
+                }}
+                className={`w-full text-left px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center justify-between transition-colors mt-1 ${
+                  periodPreset === 'full'
+                    ? 'bg-amber-500 text-white'
+                    : 'text-slate-700 hover:bg-slate-100'
+                }`}
+              >
+                <span>Mês Completo SAGA (01/09 - 19/09)</span>
+                {periodPreset === 'full' && <span className="text-[10px]">★ Ativo</span>}
+              </button>
+              <div className="border-t border-slate-100 my-1 pt-1">
+                <button
+                  onClick={() => {
+                    setShowPeriodDropdown(false);
+                    onOpenDataModal();
+                  }}
+                  className="w-full text-left px-3.5 py-2 rounded-xl text-xs font-medium text-amber-700 hover:bg-amber-50 flex items-center gap-2"
+                >
+                  <SlidersHorizontal className="w-3.5 h-3.5" />
+                  Personalizar Dados / Importar PDF
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Site Pill */}
+        <div className="flex items-center gap-3 px-4 py-2 rounded-2xl bg-white/90 border border-slate-200/80 shadow-sm backdrop-blur-md text-slate-800">
+          <div className="w-7 h-7 rounded-xl bg-slate-100 flex items-center justify-center text-slate-700">
+            <MapPin className="w-3.5 h-3.5" />
+          </div>
+          <div className="text-left leading-tight">
+            <span className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+              Site
+            </span>
+            <span className="text-[12.5px] font-bold text-slate-800 tracking-tight">
+              {siteLabel}
+            </span>
+          </div>
+        </div>
+
+        {/* Slogan with Heart Logo */}
+        <div className="flex items-center gap-2.5 pl-2 select-none">
+          <span className="text-[13.5px] font-serif italic font-bold text-slate-800 tracking-tight leading-snug text-right max-w-[135px]">
+            Juntos por um futuro mais produtivo.
+          </span>
+          <div className="w-8.5 h-8.5 rounded-xl bg-gradient-to-br from-red-600 to-amber-600 flex items-center justify-center shadow-md shadow-red-700/20">
+            <svg viewBox="0 0 24 24" className="w-4.5 h-4.5 fill-white">
+              <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+            </svg>
+          </div>
+        </div>
+
+        {/* Botão e Indicador de Modo Tela Cheia */}
+        <div className="flex items-center gap-2 pl-2 border-l border-slate-200/70">
+          <button
+            onClick={toggleFullscreen}
+            title="Alternar Tela Cheia (Apresentação / TV)"
+            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-800 text-[11px] font-black uppercase tracking-wider shadow-xs transition-all cursor-pointer group"
+          >
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
+            </span>
+            <Monitor className="w-3.5 h-3.5 text-amber-700 group-hover:scale-110 transition-transform" />
+            <span>{isFullscreen ? 'SAIR DA TELA CHEIA' : 'TELA CHEIA (APRESENTAÇÃO)'}</span>
+            {isFullscreen ? (
+              <Minimize className="w-3 h-3 text-amber-700 ml-0.5" />
+            ) : (
+              <Maximize className="w-3 h-3 text-amber-700 ml-0.5" />
+            )}
+          </button>
+        </div>
+      </div>
+    </header>
+  );
+};
+

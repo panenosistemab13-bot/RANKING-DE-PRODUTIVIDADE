@@ -1,0 +1,8 @@
+{
+  "name": "Remix Ranking de Produtividade",
+  "description": "Painel cinematográfico 1920x1080 de ranking de produtividade da 3 Corações com pódio 3D, resumo de KPIs, dados reais do SAGA e tabela translúcida.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
