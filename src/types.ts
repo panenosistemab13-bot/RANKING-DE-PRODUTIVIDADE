@@ -1,3 +1,5 @@
+import { RankingRow } from "./utils/rankingPdfParser";
+
 export interface RawProductivityEntry {
   operator: string;
   orders: number;
@@ -14,13 +16,21 @@ export interface RawProductivityEntry {
 export interface OperatorSummary {
   rank: number;
   name: string;
-  totalProductivity: number;
-  movements: number;
-  participation: number; // Percentage of total, e.g. 4.16
-  trendGrowth: number;  // Trend vs previous period, e.g. +12.4
-  sparkline: number[];  // Mini trendline points
+  totalProductivity: number; // Qtd. Serv. (Produtividade Principal do SAGA)
+  movements: number; // Movimentações (Qtd. Ordens + Peças + Lotes)
+  participation: number; // % de participação no total
+  trendGrowth: number;  // Tendência
+  sparkline: number[];  // Mini gráfico de evolução
   topActivity: string;
   activitiesCount: Record<string, number>;
+  qtdOrdens?: number;
+  qtdPecas?: number;
+  qtdLotes?: number;
+  qtdServ?: number;
+  qtdItens?: number;
+  qtdEnd?: number;
+  registros?: number;
+  registrosDetalhados?: RankingRow[];
 }
 
 export interface DashboardKPIs {

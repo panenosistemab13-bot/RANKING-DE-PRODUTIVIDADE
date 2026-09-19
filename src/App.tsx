@@ -9,6 +9,7 @@ import { DataImportExportModal } from './components/DataImportExportModal';
 import { EMPTY_OPERATORS, EMPTY_KPIS } from './data/productivityData';
 import { OperatorSummary, DashboardKPIs, PeriodPreset } from './types';
 import { ouvirRankingRealtime, carregarCacheLocal } from './services/firebase';
+import { normalizarAtividade } from './utils/rankingPdfParser';
 
 export default function App() {
   const [periodPreset, setPeriodPreset] = useState<PeriodPreset>('reference');
@@ -118,10 +119,60 @@ export default function App() {
     return EMPTY_KPIS;
   }, [customOperators, customLabel]);
 
-  // Active top 3 for the 3D podiums
-  const top1 = rawActiveOperators[0];
-  const top2 = rawActiveOperators[1];
-  const top3 = rawActiveOperators[2];
+  // Helper to recalculate top operators when an activity is selected based on Qtd. Serv.
+  const filteredActiveOperators = useMemo(() => {
+    if (!selectedActivity || selectedActivity === 'TODAS AS ATIVIDADES') {
+      return rawActiveOperators;
+    }
+    const targetNorm = normalizarAtividade(selectedActivity);
+
+    const list = rawActiveOperators
+      .map((colab) => {
+        if (colab.registrosDetalhados && colab.registrosDetalhados.length > 0) {
+          const matching = colab.registrosDetalhados.filter((r) => {
+            const regNorm = normalizarAtividade(r.atividade);
+            if (regNorm === targetNorm) return true;
+            if (regNorm.includes(targetNorm) || targetNorm.includes(regNorm)) return true;
+            if (targetNorm.includes('CONF VOLUME') && (regNorm.includes('VOLUME') || regNorm.includes('VOL'))) return true;
+            if (targetNorm.includes('CONF CARREG') && (regNorm.includes('CARREG') || regNorm.includes('CARGA'))) return true;
+            if (targetNorm.includes('CONF RECEB') && (regNorm.includes('RECEB') || regNorm.includes('REC'))) return true;
+            if (targetNorm.includes('MOV EXP') && (regNorm.includes('MOV') && regNorm.includes('EXP'))) return true;
+            if (targetNorm.includes('APANHA') && (regNorm.includes('APANHA') || regNorm.includes('SEPAR') || regNorm.includes('PICK'))) return true;
+            if (targetNorm.includes('GOODS ISSUE') && (regNorm.includes('GOODS') || regNorm.includes('ISSUE') || regNorm.includes('BAIXA'))) return true;
+            if (targetNorm.includes('MOVIMENTACAO') && regNorm.includes('MOV')) return true;
+            return false;
+          });
+
+          const sumServ = matching.reduce((t, r) => t + r.qtdServ, 0);
+          const sumOrdens = matching.reduce((t, r) => t + r.qtdOrdens, 0);
+          const sumPecas = matching.reduce((t, r) => t + r.qtdPecas, 0);
+          const sumLotes = matching.reduce((t, r) => t + r.qtdLotes, 0);
+
+          return {
+            ...colab,
+            totalProductivity: sumServ,
+            movements: sumOrdens + sumPecas + sumLotes || sumOrdens || matching.length,
+            registros: matching.length,
+          };
+        }
+
+        const actVal = colab.activitiesCount ? (colab.activitiesCount[selectedActivity] || 0) : 0;
+        return {
+          ...colab,
+          totalProductivity: actVal,
+          registros: actVal > 0 ? 1 : 0,
+        };
+      })
+      .filter((c) => c.totalProductivity > 0);
+
+    list.sort((a, b) => b.totalProductivity - a.totalProductivity);
+    return list;
+  }, [rawActiveOperators, selectedActivity]);
+
+  // Active top 3 for the 3D podiums (updates with active filter)
+  const top1 = filteredActiveOperators[0];
+  const top2 = filteredActiveOperators[1];
+  const top3 = filteredActiveOperators[2];
 
   // Uniform scale factor preserving exact 16:9 (1920x1080) aspect ratio without stretching
   const scale = useMemo(() => {

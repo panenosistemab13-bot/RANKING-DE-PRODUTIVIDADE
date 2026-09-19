@@ -12,7 +12,7 @@ export interface RankingRow {
   qtdOrdens: number;
   qtdPecas: number;
   qtdLotes: number;
-  qtdServ: number;
+  qtdServ: number; // PRODUTIVIDADE REAL DO PDF
   qtdItens: number;
   qtdEnd: number;
   data: string;
@@ -23,7 +23,7 @@ export interface RankingColaborador {
   qtdOrdens: number;
   qtdPecas: number;
   qtdLotes: number;
-  qtdServ: number;
+  qtdServ: number; // PRODUTIVIDADE = Qtd. Serv.
   qtdItens: number;
   qtdEnd: number;
   registros: number;
@@ -31,6 +31,11 @@ export interface RankingColaborador {
   datas: string[];
   percentual: number;
   posicao: number;
+  /*
+   * Guarda todos os registros originais
+   * daquele colaborador para recalcular filtros perfeitamente.
+   */
+  registrosDetalhados: RankingRow[];
 }
 
 export interface RankingPdfResult {
@@ -40,6 +45,166 @@ export interface RankingPdfResult {
   atividades: string[];
   totalRegistros: number;
   totalColaboradores: number;
+}
+
+export type FiltroAtividade = string;
+
+export type TipoOrdenacao =
+  | "produtividade"
+  | "movimentacoes"
+  | "nome";
+
+export function normalizarAtividade(
+  atividade: string
+) {
+  if (!atividade) return "";
+  return atividade
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toUpperCase();
+}
+
+/**
+ * Recalcula o ranking a partir dos registros detalhados individuais
+ * usando a coluna Qtd. Serv. como produtividade.
+ */
+export function filtrarRanking(
+  colaboradores: RankingColaborador[],
+  atividade: FiltroAtividade,
+  ordenacao: TipoOrdenacao = "produtividade"
+): RankingColaborador[] {
+  /*
+   * Primeiro filtra pela atividade.
+   *
+   * IMPORTANTE:
+   * Não filtrar pelo nome do colaborador.
+   * O filtro utiliza os registros reais
+   * encontrados no PDF.
+   */
+
+  let resultado = colaboradores.map((colaborador) => {
+    const registrosFiltrados =
+      colaborador.registrosDetalhados.filter(
+        (registro) => {
+          if (
+            !atividade ||
+            atividade === "TODAS AS ATIVIDADES"
+          ) {
+            return true;
+          }
+
+          const regNorm = normalizarAtividade(registro.atividade);
+          const atvNorm = normalizarAtividade(atividade);
+
+          if (regNorm === atvNorm) return true;
+
+          // Suporte a variações e abreviações comuns
+          if (regNorm.includes(atvNorm) || atvNorm.includes(regNorm)) return true;
+          if (atvNorm.includes("CONF VOLUME") && (regNorm.includes("VOLUME") || regNorm.includes("VOL"))) return true;
+          if (atvNorm.includes("CONF CARREG") && (regNorm.includes("CARREG") || regNorm.includes("CARGA"))) return true;
+          if (atvNorm.includes("CONF RECEB") && (regNorm.includes("RECEB") || regNorm.includes("REC"))) return true;
+          if (atvNorm.includes("MOV EXP") && (regNorm.includes("MOV") && regNorm.includes("EXP"))) return true;
+          if (atvNorm.includes("APANHA") && (regNorm.includes("APANHA") || regNorm.includes("SEPAR") || regNorm.includes("PICK"))) return true;
+          if (atvNorm.includes("GOODS ISSUE") && (regNorm.includes("GOODS") || regNorm.includes("ISSUE") || regNorm.includes("BAIXA"))) return true;
+          if (atvNorm.includes("MOVIMENTACAO") && regNorm.includes("MOV")) return true;
+
+          return false;
+        }
+      );
+
+    /*
+     * REFAZ OS TOTAIS SOMENTE COM OS
+     * REGISTROS DA ATIVIDADE SELECIONADA.
+     */
+
+    const somas = {
+      qtdOrdens: registrosFiltrados.reduce((total, r) => total + r.qtdOrdens, 0),
+      qtdPecas: registrosFiltrados.reduce((total, r) => total + r.qtdPecas, 0),
+      qtdLotes: registrosFiltrados.reduce((total, r) => total + r.qtdLotes, 0),
+      /*
+       * ESTE É O CAMPO PRINCIPAL.
+       * PRODUTIVIDADE = Qtd. Serv.
+       */
+      qtdServ: registrosFiltrados.reduce((total, r) => total + r.qtdServ, 0),
+      qtdItens: registrosFiltrados.reduce((total, r) => total + r.qtdItens, 0),
+      qtdEnd: registrosFiltrados.reduce((total, r) => total + r.qtdEnd, 0),
+      registros: registrosFiltrados.length,
+      registrosDetalhados: registrosFiltrados,
+      atividades: Array.from(new Set(registrosFiltrados.map(r => r.atividade))),
+      datas: Array.from(new Set(registrosFiltrados.map(r => r.data))),
+    };
+
+    return {
+      ...colaborador,
+      ...somas,
+    };
+  });
+
+  /*
+   * Remove colaboradores que não possuem
+   * nenhum registro na atividade escolhida.
+   */
+
+  resultado = resultado.filter(
+    (colaborador) => colaborador.registros > 0
+  );
+
+  /*
+   * ORDENAÇÃO
+   *
+   * Produtividade = Qtd. Serv.
+   */
+
+  if (ordenacao === "produtividade") {
+    resultado.sort((a, b) => {
+      if (b.qtdServ !== a.qtdServ) {
+        return b.qtdServ - a.qtdServ;
+      }
+
+      /*
+       * Desempate determinístico.
+       * Assim o nome não fica mudando
+       * de posição entre importações.
+       */
+      return a.nome.localeCompare(b.nome, "pt-BR", {
+        sensitivity: "base",
+      });
+    });
+  } else if (ordenacao === "movimentacoes") {
+    /*
+     * Ordenação por movimentações.
+     */
+    resultado.sort((a, b) => {
+      const movA = a.qtdOrdens + a.qtdPecas + a.qtdLotes;
+      const movB = b.qtdOrdens + b.qtdPecas + b.qtdLotes;
+
+      if (movB !== movA) {
+        return movB - movA;
+      }
+
+      return a.nome.localeCompare(b.nome, "pt-BR", {
+        sensitivity: "base",
+      });
+    });
+  } else if (ordenacao === "nome") {
+    resultado.sort((a, b) =>
+      a.nome.localeCompare(b.nome, "pt-BR", { sensitivity: "base" })
+    );
+  }
+
+  /*
+   * RECALCULA O PERCENTUAL E AS POSIÇÕES.
+   */
+
+  const totalProdutividade = resultado.reduce((soma, c) => soma + c.qtdServ, 0);
+
+  return resultado.map((colaborador, index) => ({
+    ...colaborador,
+    posicao: index + 1,
+    percentual: totalProdutividade > 0 ? (colaborador.qtdServ / totalProdutividade) * 100 : 0,
+  }));
 }
 
 /* =========================================================
@@ -145,22 +310,6 @@ async function extrairPaginas(file: File) {
 
     const content = await pagina.getTextContent();
 
-    /*
-      O PDF separa:
-      
-      NOME
-      52
-      0
-      6
-      276
-      58
-      58
-      DATA
-
-      Portanto NÃO podemos simplesmente procurar
-      "nome + números + data" em uma única string.
-    */
-
     const linhas = content.items
       .map((item: any) => String(item.str ?? "").trim())
       .filter(Boolean);
@@ -181,20 +330,18 @@ async function extrairPaginas(file: File) {
 export async function lerRankingProdutividade(
   file: File
 ): Promise<RankingPdfResult> {
-
   if (!file) {
     throw new Error("Nenhum PDF foi selecionado.");
   }
 
-  const { pdf, paginas } =
-    await extrairPaginas(file);
+  const { pdf, paginas } = await extrairPaginas(file);
 
   const registros: RankingRow[] = [];
 
   let atividadeAtual = "NÃO INFORMADA";
 
   /* =======================================================
-     PERCORRE TODAS AS 39 PÁGINAS
+     PERCORRE TODAS AS PÁGINAS
   ======================================================= */
 
   for (
@@ -202,70 +349,38 @@ export async function lerRankingProdutividade(
     paginaIndex < paginas.length;
     paginaIndex++
   ) {
-
     const pagina = paginaIndex + 1;
-
     const linhas = paginas[paginaIndex];
 
-    /*
-      Atualiza atividade sempre que encontrar:
-      Atividade: APANHA
-      Atividade: APANHA PALETE
-      etc.
-    */
-
     for (let i = 0; i < linhas.length; i++) {
-
       const linhaAtual = linhas[i];
 
-      atividadeAtual =
-        extrairAtividade(
-          linhaAtual,
-          atividadeAtual
-        );
-
-      /*
-        Ignora cabeçalhos e rodapés.
-      */
+      atividadeAtual = extrairAtividade(
+        linhaAtual,
+        atividadeAtual
+      );
 
       if (ignorarLinha(linhaAtual)) {
         continue;
       }
 
       /*
-        ====================================================
-        ESTRUTURA REAL DO PDF
-
-        NOME
-        ORDEM
-        PEÇA
-        LOTE
-        SERV
-        ITEM
-        END
-        DATA
-
-        Portanto procuramos:
-
-        DATA
-          ↑
-        6 números
-          ↑
-        NOME
-        ====================================================
+        ESTRUTURA DO PDF:
+        Colaborador
+        Qtd. Ordens
+        Qtd. Peças
+        Qtd. Lotes
+        Qtd. Serv.   (4º número depois do nome = Produtividade)
+        Qtd. Itens
+        Qtd. End.
+        Data
       */
 
       if (!ehData(linhaAtual)) {
         continue;
       }
 
-      /*
-        A data está depois de exatamente
-        6 números.
-      */
-
       const indiceData = i;
-
       const indiceEnd = indiceData - 1;
       const indiceItens = indiceData - 2;
       const indiceServ = indiceData - 3;
@@ -273,10 +388,6 @@ export async function lerRankingProdutividade(
       const indicePecas = indiceData - 5;
       const indiceOrdens = indiceData - 6;
       const indiceNome = indiceData - 7;
-
-      /*
-        Verifica se todos os campos existem.
-      */
 
       if (indiceNome < 0) {
         continue;
@@ -289,10 +400,6 @@ export async function lerRankingProdutividade(
       const qtdPecas = linhas[indicePecas];
       const qtdOrdens = linhas[indiceOrdens];
 
-      /*
-        Todos os seis campos precisam ser números.
-      */
-
       if (
         !ehNumero(qtdEnd) ||
         !ehNumero(qtdItens) ||
@@ -304,21 +411,13 @@ export async function lerRankingProdutividade(
         continue;
       }
 
-      let nome = limparNome(
-        linhas[indiceNome]
-      );
-
-      /*
-        Evita capturar cabeçalhos.
-      */
+      let nome = limparNome(linhas[indiceNome]);
 
       if (!nome) {
         continue;
       }
 
-      if (
-        nome.toLowerCase().includes("atividade:")
-      ) {
+      if (nome.toLowerCase().includes("atividade:")) {
         continue;
       }
 
@@ -330,26 +429,16 @@ export async function lerRankingProdutividade(
         continue;
       }
 
-      /*
-        ====================================================
-        REGISTRO VÁLIDO
-        ====================================================
-      */
-
       registros.push({
         pagina,
-
         atividade: atividadeAtual,
-
         colaborador: nome,
-
         qtdOrdens: numero(qtdOrdens),
         qtdPecas: numero(qtdPecas),
         qtdLotes: numero(qtdLotes),
         qtdServ: numero(qtdServ),
         qtdItens: numero(qtdItens),
         qtdEnd: numero(qtdEnd),
-
         data: linhaAtual,
       });
     }
@@ -359,208 +448,87 @@ export async function lerRankingProdutividade(
      AGRUPAMENTO DOS COLABORADORES
   ======================================================= */
 
-  const mapa =
-    new Map<string, RankingColaborador>();
+  const mapa = new Map<string, RankingColaborador>();
 
   for (const registro of registros) {
+    const chave = normalizarChave(registro.colaborador);
 
-    const chave =
-      normalizarChave(
-        registro.colaborador
-      );
-
-    let colaborador =
-      mapa.get(chave);
+    let colaborador = mapa.get(chave);
 
     if (!colaborador) {
-
       colaborador = {
         nome: registro.colaborador,
-
         qtdOrdens: 0,
         qtdPecas: 0,
         qtdLotes: 0,
         qtdServ: 0,
         qtdItens: 0,
         qtdEnd: 0,
-
         registros: 0,
-
         atividades: [],
-
         datas: [],
-
         percentual: 0,
-
         posicao: 0,
+        registrosDetalhados: [],
       };
 
-      mapa.set(
-        chave,
-        colaborador
-      );
+      mapa.set(chave, colaborador);
     }
 
-    /*
-      SOMA TODAS AS OCORRÊNCIAS.
-    */
-
-    colaborador.qtdOrdens +=
-      registro.qtdOrdens;
-
-    colaborador.qtdPecas +=
-      registro.qtdPecas;
-
-    colaborador.qtdLotes +=
-      registro.qtdLotes;
-
-    colaborador.qtdServ +=
-      registro.qtdServ;
-
-    colaborador.qtdItens +=
-      registro.qtdItens;
-
-    colaborador.qtdEnd +=
-      registro.qtdEnd;
-
+    colaborador.qtdOrdens += registro.qtdOrdens;
+    colaborador.qtdPecas += registro.qtdPecas;
+    colaborador.qtdLotes += registro.qtdLotes;
+    colaborador.qtdServ += registro.qtdServ;
+    colaborador.qtdItens += registro.qtdItens;
+    colaborador.qtdEnd += registro.qtdEnd;
     colaborador.registros++;
 
-    if (
-      !colaborador.atividades.includes(
-        registro.atividade
-      )
-    ) {
-      colaborador.atividades.push(
-        registro.atividade
-      );
+    if (!colaborador.atividades.includes(registro.atividade)) {
+      colaborador.atividades.push(registro.atividade);
     }
 
-    if (
-      !colaborador.datas.includes(
-        registro.data
-      )
-    ) {
-      colaborador.datas.push(
-        registro.data
-      );
+    if (!colaborador.datas.includes(registro.data)) {
+      colaborador.datas.push(registro.data);
     }
+
+    // Guarda cada registro original
+    colaborador.registrosDetalhados.push(registro);
   }
 
-  /* =======================================================
-     TRANSFORMA MAP EM ARRAY
-  ======================================================= */
-
-  const colaboradores =
-    Array.from(
-      mapa.values()
-    );
+  const colaboradores = Array.from(mapa.values());
 
   /* =======================================================
-     ORDENAÇÃO
+     ORDENAÇÃO INICIAL POR Qtd. Serv. (PRODUTIVIDADE)
   ======================================================= */
 
-  colaboradores.sort(
-    (a, b) => {
-
-      if (
-        b.qtdOrdens !==
-        a.qtdOrdens
-      ) {
-        return (
-          b.qtdOrdens -
-          a.qtdOrdens
-        );
-      }
-
-      if (
-        b.qtdPecas !==
-        a.qtdPecas
-      ) {
-        return (
-          b.qtdPecas -
-          a.qtdPecas
-        );
-      }
-
-      if (
-        b.qtdItens !==
-        a.qtdItens
-      ) {
-        return (
-          b.qtdItens -
-          a.qtdItens
-        );
-      }
-
-      return (
-        b.qtdEnd -
-        a.qtdEnd
-      );
+  colaboradores.sort((a, b) => {
+    if (b.qtdServ !== a.qtdServ) {
+      return b.qtdServ - a.qtdServ;
     }
+    return a.nome.localeCompare(b.nome, "pt-BR", { sensitivity: "base" });
+  });
+
+  const totalServ = colaboradores.reduce(
+    (soma, colaborador) => soma + colaborador.qtdServ,
+    0
   );
 
-  /* =======================================================
-     POSIÇÃO
-  ======================================================= */
+  colaboradores.forEach((colaborador, index) => {
+    colaborador.posicao = index + 1;
+    colaborador.percentual =
+      totalServ > 0 ? (colaborador.qtdServ / totalServ) * 100 : 0;
+  });
 
-  const total =
-    colaboradores.reduce(
-      (soma, colaborador) =>
-        soma +
-        colaborador.qtdOrdens,
-      0
-    );
-
-  colaboradores.forEach(
-    (colaborador, index) => {
-
-      colaborador.posicao =
-        index + 1;
-
-      colaborador.percentual =
-        total > 0
-          ? (
-              colaborador.qtdOrdens /
-              total
-            ) * 100
-          : 0;
-    }
+  const atividades = Array.from(
+    new Set(registros.map((registro) => registro.atividade))
   );
-
-  /* =======================================================
-     TODAS AS ATIVIDADES
-  ======================================================= */
-
-  const atividades =
-    Array.from(
-      new Set(
-        registros.map(
-          registro =>
-            registro.atividade
-        )
-      )
-    );
-
-  /* =======================================================
-     RESULTADO FINAL
-  ======================================================= */
 
   return {
-
-    totalPaginas:
-      pdf.numPages,
-
-    linhas:
-      registros,
-
+    totalPaginas: pdf.numPages,
+    linhas: registros,
     colaboradores,
-
     atividades,
-
-    totalRegistros:
-      registros.length,
-
-    totalColaboradores:
-      colaboradores.length,
+    totalRegistros: registros.length,
+    totalColaboradores: colaboradores.length,
   };
 }

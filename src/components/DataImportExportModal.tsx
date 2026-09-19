@@ -40,13 +40,15 @@ export const DataImportExportModal: React.FC<DataImportExportModalProps> = ({
   const processRankingResult = async (result: RankingPdfResult, fileName: string) => {
     // Convert RankingColaborador[] to OperatorSummary[]
     const parsedOperators: OperatorSummary[] = result.colaboradores.map((colab, idx) => {
-      // Calculate activities map
+      // Calculate activities map using Qtd. Serv. (produtividade real)
       const activitiesMap: Record<string, number> = {};
-      result.linhas
-        .filter(l => l.colaborador.toUpperCase() === colab.nome.toUpperCase())
-        .forEach(l => {
-          activitiesMap[l.atividade] = (activitiesMap[l.atividade] || 0) + l.qtdOrdens;
-        });
+      const colabRows = (colab.registrosDetalhados && colab.registrosDetalhados.length > 0)
+        ? colab.registrosDetalhados
+        : result.linhas.filter(l => l.colaborador.toUpperCase() === colab.nome.toUpperCase());
+
+      colabRows.forEach(l => {
+        activitiesMap[l.atividade] = (activitiesMap[l.atividade] || 0) + (l.qtdServ || 0);
+      });
 
       // Find top activity
       let topAct = "APANHA";
@@ -59,14 +61,11 @@ export const DataImportExportModal: React.FC<DataImportExportModalProps> = ({
       });
 
       // Generate sparkline values based on daily entries or smoothed distribution
-      const operatorRows = result.linhas.filter(
-        l => l.colaborador.toUpperCase() === colab.nome.toUpperCase()
-      );
       let sparkline: number[] = [];
-      if (operatorRows.length >= 3) {
-        sparkline = operatorRows.map(r => r.qtdOrdens);
+      if (colabRows.length >= 3) {
+        sparkline = colabRows.map(r => r.qtdServ || r.qtdOrdens || 1);
       } else {
-        const base = colab.qtdOrdens;
+        const base = colab.qtdServ || colab.qtdOrdens || 10;
         sparkline = [
           Math.round(base * 0.12),
           Math.round(base * 0.14),
@@ -78,16 +77,26 @@ export const DataImportExportModal: React.FC<DataImportExportModalProps> = ({
         ];
       }
 
+      const totalMov = (colab.qtdOrdens || 0) + (colab.qtdPecas || 0) + (colab.qtdLotes || 0);
+
       return {
         rank: idx + 1,
         name: colab.nome,
-        totalProductivity: colab.qtdOrdens,
-        movements: colab.qtdServ || colab.qtdEnd || colab.qtdItens || colab.registros * 10,
+        totalProductivity: colab.qtdServ, // Qtd. Serv.
+        movements: totalMov > 0 ? totalMov : (colab.qtdOrdens || colab.registros || 1),
         participation: +colab.percentual.toFixed(2),
         trendGrowth: +(7.5 + (idx < 5 ? 2.4 : -1.2)).toFixed(1),
         sparkline,
         topActivity: topAct,
-        activitiesCount: Object.keys(activitiesMap).length > 0 ? activitiesMap : { APANHA: colab.qtdOrdens }
+        activitiesCount: Object.keys(activitiesMap).length > 0 ? activitiesMap : { [topAct]: colab.qtdServ },
+        qtdOrdens: colab.qtdOrdens,
+        qtdPecas: colab.qtdPecas,
+        qtdLotes: colab.qtdLotes,
+        qtdServ: colab.qtdServ,
+        qtdItens: colab.qtdItens,
+        qtdEnd: colab.qtdEnd,
+        registros: colab.registros,
+        registrosDetalhados: colabRows,
       };
     });
 

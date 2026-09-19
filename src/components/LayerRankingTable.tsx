@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
-import { Search, Filter, ArrowUp, ArrowDown, ChevronDown, Check, Trophy, Sparkles, Activity, ShieldCheck } from 'lucide-react';
+import { Search, Filter, ArrowUp, ArrowDown, ChevronDown, Check, Trophy, Sparkles, Activity, ShieldCheck, X, RotateCcw } from 'lucide-react';
 import { OperatorSummary } from '../types';
-import { AVAILABLE_ACTIVITIES } from '../data/productivityData';
+import { normalizarAtividade, RankingColaborador, RankingRow } from '../utils/rankingPdfParser';
 
 interface LayerRankingTableProps {
   operators: OperatorSummary[];
@@ -22,34 +22,165 @@ export const LayerRankingTable: React.FC<LayerRankingTableProps> = ({
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
-  const [sortBy, setSortBy] = useState<'productivity' | 'movements'>('productivity');
+  const [sortBy, setSortBy] = useState<'produtividade' | 'movimentacoes' | 'nome'>('produtividade');
 
-  // Filter and sort operators
-  const filteredOperators = useMemo(() => {
-    let list = operators.filter((op) => {
-      const matchesSearch = op.name.toLowerCase().includes(searchTerm.toLowerCase());
-      if (!matchesSearch) return false;
+  // Extrai dinamicamente todas as atividades reais encontradas no conjunto de dados
+  const availableActivities = useMemo(() => {
+    const list: string[] = ['TODAS AS ATIVIDADES'];
+    const standard = [
+      'APANHA',
+      'CONF CARREG',
+      'CONF VOLUME',
+      'GOODS ISSUE',
+      'MOV/EXP',
+      'CONF RECEBIMENTO',
+      'MOVIMENTACAO'
+    ];
 
-      if (selectedActivity !== 'TODAS AS ATIVIDADES') {
-        return op.activitiesCount && op.activitiesCount[selectedActivity] > 0;
+    const foundSet = new Set<string>();
+
+    operators.forEach((op) => {
+      if (op.registrosDetalhados) {
+        op.registrosDetalhados.forEach((r) => {
+          if (r.atividade) foundSet.add(r.atividade.trim());
+        });
       }
-      return true;
+      if (op.topActivity) {
+        foundSet.add(op.topActivity.trim());
+      }
+      if (op.activitiesCount) {
+        Object.keys(op.activitiesCount).forEach((act) => {
+          foundSet.add(act.replace(/_/g, '/').trim());
+        });
+      }
     });
 
-    if (sortBy === 'movements') {
-      list = [...list].sort((a, b) => b.movements - a.movements);
-    } else {
-      list = [...list].sort((a, b) => b.totalProductivity - a.totalProductivity);
-    }
+    standard.forEach((s) => foundSet.add(s));
+
+    foundSet.forEach((item) => {
+      if (item && item.toUpperCase() !== 'TODAS AS ATIVIDADES') {
+        list.push(item);
+      }
+    });
 
     return list;
-  }, [operators, searchTerm, selectedActivity, sortBy]);
-
-  // Max value for progress bar scaling
-  const maxProductivity = useMemo(() => {
-    if (operators.length === 0) return 1;
-    return Math.max(...operators.map((o) => o.totalProductivity));
   }, [operators]);
+
+  /*
+   * RECALCULA O RANKING A PARTIR DOS REGISTROS INDIVIDUAIS
+   * PRODUTIVIDADE = Qtd. Serv. (4º campo do PDF)
+   */
+  const filteredOperators = useMemo<OperatorSummary[]>(() => {
+    const searchNorm = normalizarAtividade(searchTerm);
+
+    // 1. Mapeia e recalcula os totais de cada colaborador para a atividade selecionada
+    let resultado = operators.map((colab) => {
+      // Se possui registros detalhados, filtra estritamente por atividade
+      if (colab.registrosDetalhados && colab.registrosDetalhados.length > 0) {
+        const registrosFiltrados = colab.registrosDetalhados.filter((registro) => {
+          if (!selectedActivity || selectedActivity === 'TODAS AS ATIVIDADES') {
+            return true;
+          }
+
+          const regNorm = normalizarAtividade(registro.atividade);
+          const atvNorm = normalizarAtividade(selectedActivity);
+
+          if (regNorm === atvNorm) return true;
+          if (regNorm.includes(atvNorm) || atvNorm.includes(regNorm)) return true;
+
+          // Abreviações comuns
+          if (atvNorm.includes('CONF VOLUME') && (regNorm.includes('VOLUME') || regNorm.includes('VOL'))) return true;
+          if (atvNorm.includes('CONF CARREG') && (regNorm.includes('CARREG') || regNorm.includes('CARGA'))) return true;
+          if (atvNorm.includes('CONF RECEB') && (regNorm.includes('RECEB') || regNorm.includes('REC'))) return true;
+          if (atvNorm.includes('MOV EXP') && (regNorm.includes('MOV') && regNorm.includes('EXP'))) return true;
+          if (atvNorm.includes('APANHA') && (regNorm.includes('APANHA') || regNorm.includes('SEPAR') || regNorm.includes('PICK'))) return true;
+          if (atvNorm.includes('GOODS ISSUE') && (regNorm.includes('GOODS') || regNorm.includes('ISSUE') || regNorm.includes('BAIXA'))) return true;
+          if (atvNorm.includes('MOVIMENTACAO') && regNorm.includes('MOV')) return true;
+
+          return false;
+        });
+
+        const sumOrdens = registrosFiltrados.reduce((t, r) => t + r.qtdOrdens, 0);
+        const sumPecas = registrosFiltrados.reduce((t, r) => t + r.qtdPecas, 0);
+        const sumLotes = registrosFiltrados.reduce((t, r) => t + r.qtdLotes, 0);
+        const sumServ = registrosFiltrados.reduce((t, r) => t + r.qtdServ, 0);
+        const sumItens = registrosFiltrados.reduce((t, r) => t + r.qtdItens, 0);
+        const sumEnd = registrosFiltrados.reduce((t, r) => t + r.qtdEnd, 0);
+
+        const totalMov = sumOrdens + sumPecas + sumLotes;
+
+        return {
+          ...colab,
+          totalProductivity: sumServ, // PRODUTIVIDADE = Qtd. Serv.
+          movements: totalMov > 0 ? totalMov : (sumOrdens || registrosFiltrados.length),
+          qtdOrdens: sumOrdens,
+          qtdPecas: sumPecas,
+          qtdLotes: sumLotes,
+          qtdServ: sumServ,
+          qtdItens: sumItens,
+          qtdEnd: sumEnd,
+          registros: registrosFiltrados.length,
+          registrosDetalhados: registrosFiltrados,
+        };
+      }
+
+      // Fallback se não tiver registros detalhados gravados
+      if (selectedActivity && selectedActivity !== 'TODAS AS ATIVIDADES') {
+        const actVal = colab.activitiesCount ? (colab.activitiesCount[selectedActivity] || 0) : 0;
+        return {
+          ...colab,
+          totalProductivity: actVal,
+          registros: actVal > 0 ? 1 : 0,
+        };
+      }
+
+      return colab;
+    });
+
+    // 2. Remove colaboradores que não possuem nenhum registro na atividade selecionada
+    if (selectedActivity && selectedActivity !== 'TODAS AS ATIVIDADES') {
+      resultado = resultado.filter((c) => (c.registros ?? 0) > 0 || c.totalProductivity > 0);
+    }
+
+    // 3. Aplica busca por nome (se houver termo digitado)
+    if (searchNorm) {
+      resultado = resultado.filter((c) => normalizarAtividade(c.name).includes(searchNorm));
+    }
+
+    // 4. Ordenação
+    if (sortBy === 'produtividade') {
+      resultado.sort((a, b) => {
+        if (b.totalProductivity !== a.totalProductivity) {
+          return b.totalProductivity - a.totalProductivity;
+        }
+        return a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' });
+      });
+    } else if (sortBy === 'movimentacoes') {
+      resultado.sort((a, b) => {
+        if (b.movements !== a.movements) {
+          return b.movements - a.movements;
+        }
+        return a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' });
+      });
+    } else if (sortBy === 'nome') {
+      resultado.sort((a, b) => a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' }));
+    }
+
+    // 5. Recalcula posições e percentuais
+    const totalProdFiltrado = resultado.reduce((s, c) => s + c.totalProductivity, 0);
+
+    return resultado.map((colab, index) => ({
+      ...colab,
+      rank: index + 1,
+      participation: totalProdFiltrado > 0 ? +((colab.totalProductivity / totalProdFiltrado) * 100).toFixed(2) : 0,
+    }));
+  }, [operators, selectedActivity, searchTerm, sortBy]);
+
+  // Maior valor para cálculo visual das barras de progresso
+  const maxProductivity = useMemo(() => {
+    if (filteredOperators.length === 0) return 1;
+    return Math.max(...filteredOperators.map((o) => o.totalProductivity));
+  }, [filteredOperators]);
 
   const formatNumber = (val: number) => {
     return val.toLocaleString('pt-BR');
@@ -115,6 +246,8 @@ export const LayerRankingTable: React.FC<LayerRankingTableProps> = ({
     );
   };
 
+  const isFilterActive = selectedActivity !== 'TODAS AS ATIVIDADES' || searchTerm.trim() !== '' || sortBy !== 'produtividade';
+
   return (
     <div className="ranking-table-3d w-full h-[510px] p-6 flex flex-col justify-between relative overflow-hidden select-none">
       {/* Table Header: Title + Search + Filter Button */}
@@ -126,85 +259,125 @@ export const LayerRankingTable: React.FC<LayerRankingTableProps> = ({
             <Sparkles className="w-3.5 h-3.5 text-amber-200 absolute -top-1 -right-1 animate-spin" style={{ animationDuration: '6s' }} />
           </div>
 
-          <div className="flex items-baseline gap-3">
+          <div className="flex items-center gap-3">
             <h3 className="text-[21px] font-black tracking-tight text-[#0f2444] uppercase font-heading drop-shadow-xs flex items-center gap-2">
               RANKING COMPLETO
               <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-slate-900 text-amber-400 tracking-widest border border-slate-800">
-                3D 4K ULTRA
+                PRODUTIVIDADE SAGA (QTD. SERV.)
               </span>
             </h3>
 
+            {/* Badge de Atividade Ativa com Botão X para Limpar */}
             {selectedActivity !== 'TODAS AS ATIVIDADES' && (
-              <span className="text-xs font-extrabold px-3 py-1 rounded-full bg-amber-500 text-white shadow-md shadow-amber-500/25 uppercase tracking-wide border border-amber-400">
-                {selectedActivity}
-              </span>
+              <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 text-white font-extrabold text-xs shadow-md shadow-amber-500/25 uppercase tracking-wide border border-amber-300">
+                <span>{selectedActivity}</span>
+                <button
+                  onClick={() => onSelectActivity('TODAS AS ATIVIDADES')}
+                  title="Remover filtro de atividade"
+                  className="w-4 h-4 rounded-full bg-white/20 hover:bg-white/40 flex items-center justify-center transition-colors cursor-pointer ml-1"
+                >
+                  <X className="w-2.5 h-2.5" />
+                </button>
+              </div>
+            )}
+
+            {searchTerm.trim() !== '' && (
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-500 text-white font-bold text-xs shadow-sm uppercase">
+                <span>Busca: "{searchTerm}"</span>
+                <button
+                  onClick={() => setSearchTerm('')}
+                  title="Limpar busca"
+                  className="w-4 h-4 rounded-full bg-white/20 hover:bg-white/40 flex items-center justify-center transition-colors cursor-pointer"
+                >
+                  <X className="w-2.5 h-2.5" />
+                </button>
+              </div>
             )}
           </div>
         </div>
 
-        {/* Search & Filter Controls with Glossy 3D Finish */}
-        <div className="flex items-center gap-3 relative">
+        {/* Right Search & Filters */}
+        <div className="flex items-center gap-3">
           {/* Search Box */}
-          <div className="relative w-80">
-            <Search className="w-4 h-4 text-amber-600/70 absolute left-3.5 top-1/2 -translate-y-1/2" />
+          <div className="relative">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               placeholder="Buscar colaborador..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9.5 pr-4 py-2.5 text-xs font-bold rounded-2xl bg-white/95 border border-slate-200/90 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 placeholder:text-slate-400 text-slate-900 transition-all shadow-sm"
+              className="w-56 h-9.5 pl-10 pr-4 text-xs font-semibold text-slate-800 placeholder-slate-400 bg-white/90 border border-slate-200/80 rounded-2xl shadow-2xs focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition-all"
             />
-
             {searchTerm && (
               <button
                 onClick={() => setSearchTerm('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-600 flex items-center justify-center text-xs font-bold"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
               >
-                ✕
+                <X className="w-3.5 h-3.5" />
               </button>
             )}
           </div>
 
-          {/* Filter Popover Button with 3D Effect */}
+          {/* Filter Dropdown */}
           <div className="relative">
             <button
               onClick={() => setShowFilterDropdown(!showFilterDropdown)}
-              className={`flex items-center gap-2 px-4.5 py-2.5 rounded-2xl border text-xs font-extrabold transition-all shadow-md ${
-                showFilterDropdown || selectedActivity !== 'TODAS AS ATIVIDADES'
-                  ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-white border-amber-600 shadow-amber-500/25'
-                  : 'bg-white/95 text-slate-800 border-slate-200/90 hover:bg-white hover:border-slate-300'
+              className={`flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-bold border shadow-xs transition-all duration-150 cursor-pointer ${
+                isFilterActive
+                  ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white border-amber-400 shadow-md shadow-amber-500/25'
+                  : 'bg-white/90 text-slate-700 border-slate-200/80 hover:bg-white hover:border-slate-300'
               }`}
             >
               <Filter className="w-3.5 h-3.5" />
-              <span>FILTROS</span>
+              <span className="uppercase tracking-wide font-heading">
+                {selectedActivity !== 'TODAS AS ATIVIDADES' ? selectedActivity : 'FILTROS'}
+              </span>
               <ChevronDown className="w-3 h-3 ml-0.5" />
             </button>
 
             {/* Filter Dropdown Menu */}
             {showFilterDropdown && (
               <div className="absolute right-0 mt-2.5 w-76 rounded-3xl bg-white/95 backdrop-blur-2xl border border-slate-200/90 shadow-2xl p-3.5 z-50 animate-in fade-in zoom-in-95 duration-150">
-                <div className="px-2 py-1 text-[10.5px] font-black uppercase tracking-wider text-slate-400">
-                  Filtrar por Atividade
+                <div className="flex items-center justify-between px-2 py-1">
+                  <span className="text-[10.5px] font-black uppercase tracking-wider text-slate-400">
+                    Filtrar por Atividade
+                  </span>
+                  {isFilterActive && (
+                    <button
+                      onClick={() => {
+                        onSelectActivity('TODAS AS ATIVIDADES');
+                        setSearchTerm('');
+                        setSortBy('produtividade');
+                      }}
+                      className="text-[10px] font-bold text-amber-600 hover:text-amber-700 flex items-center gap-1 cursor-pointer"
+                    >
+                      <RotateCcw className="w-2.5 h-2.5" />
+                      Resetar
+                    </button>
+                  )}
                 </div>
 
                 <div className="flex flex-col gap-0.5 max-h-56 overflow-y-auto custom-scrollbar my-1">
-                  {AVAILABLE_ACTIVITIES.map((act) => (
-                     <button
-                      key={act}
-                      onClick={() => {
-                        onSelectActivity(act);
-                        setShowFilterDropdown(false);
-                      }}
-                      className={`w-full text-left px-3.5 py-2 rounded-xl text-xs font-bold flex items-center justify-between transition-all ${
-                        selectedActivity === act
-                          ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-white shadow-sm'
-                          : 'text-slate-700 hover:bg-slate-100/80'
-                      }`}
-                    >
-                      <span className="truncate">{act}</span>
-                      {selectedActivity === act && <Check className="w-3.5 h-3.5 shrink-0" />}
-                    </button>
-                  ))}
+                  {availableActivities.map((act) => {
+                    const isSelected = selectedActivity === act;
+                    return (
+                      <button
+                        key={act}
+                        onClick={() => {
+                          onSelectActivity(act);
+                          setShowFilterDropdown(false);
+                        }}
+                        className={`w-full text-left px-3.5 py-2 rounded-xl text-xs font-bold flex items-center justify-between transition-all cursor-pointer ${
+                          isSelected
+                            ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-sm'
+                            : 'text-slate-700 hover:bg-slate-100/80'
+                        }`}
+                      >
+                        <span className="truncate">{act}</span>
+                        {isSelected && <Check className="w-3.5 h-3.5 shrink-0" />}
+                      </button>
+                    );
+                  })}
                 </div>
 
                 <div className="border-t border-slate-100 my-2 pt-2.5">
@@ -212,27 +385,38 @@ export const LayerRankingTable: React.FC<LayerRankingTableProps> = ({
                     Ordenar Por
                   </div>
 
-                  <div className="grid grid-cols-2 gap-1.5 mt-1">
+                  <div className="grid grid-cols-3 gap-1.5 mt-1">
                     <button
-                      onClick={() => setSortBy('productivity')}
-                      className={`px-3 py-2 rounded-xl text-xs font-black text-center transition-all ${
-                        sortBy === 'productivity'
+                      onClick={() => setSortBy('produtividade')}
+                      className={`px-2 py-2 rounded-xl text-[11px] font-black text-center transition-all cursor-pointer ${
+                        sortBy === 'produtividade'
                           ? 'bg-slate-900 text-white shadow-md'
                           : 'bg-slate-100 text-slate-700 hover:bg-slate-200/80'
                       }`}
                     >
-                      Produtividade
+                      Produtiv.
                     </button>
 
                     <button
-                      onClick={() => setSortBy('movements')}
-                      className={`px-3 py-2 rounded-xl text-xs font-black text-center transition-all ${
-                        sortBy === 'movements'
+                      onClick={() => setSortBy('movimentacoes')}
+                      className={`px-2 py-2 rounded-xl text-[11px] font-black text-center transition-all cursor-pointer ${
+                        sortBy === 'movimentacoes'
                           ? 'bg-slate-900 text-white shadow-md'
                           : 'bg-slate-100 text-slate-700 hover:bg-slate-200/80'
                       }`}
                     >
-                      Movimentações
+                      Moviment.
+                    </button>
+
+                    <button
+                      onClick={() => setSortBy('nome')}
+                      className={`px-2 py-2 rounded-xl text-[11px] font-black text-center transition-all cursor-pointer ${
+                        sortBy === 'nome'
+                          ? 'bg-slate-900 text-white shadow-md'
+                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200/80'
+                      }`}
+                    >
+                      Nome A-Z
                     </button>
                   </div>
                 </div>
@@ -261,7 +445,7 @@ export const LayerRankingTable: React.FC<LayerRankingTableProps> = ({
         </div>
         <div>COLABORADOR</div>
         <div className="px-2">DESEMPENHO RELATIVO</div>
-        <div className="text-right">TOTAL DE PRODUTIVIDADE</div>
+        <div className="text-right">PRODUTIVIDADE (QTD. SERV.)</div>
         <div className="text-center">MOVIMENTAÇÕES</div>
         <div className="text-center">PARTICIPAÇÃO</div>
         <div className="text-center flex items-center justify-center gap-1">
@@ -275,7 +459,19 @@ export const LayerRankingTable: React.FC<LayerRankingTableProps> = ({
         {filteredOperators.length === 0 ? (
           <div className="h-44 flex flex-col items-center justify-center text-slate-400">
             <Search className="w-8 h-8 mb-2 opacity-40" />
-            <p className="text-sm font-bold">Nenhum colaborador encontrado com os filtros atuais.</p>
+            <p className="text-sm font-bold">Nenhum registro encontrado para esta atividade.</p>
+            {isFilterActive && (
+              <button
+                onClick={() => {
+                  onSelectActivity('TODAS AS ATIVIDADES');
+                  setSearchTerm('');
+                  setSortBy('produtividade');
+                }}
+                className="mt-3 px-4 py-1.5 rounded-xl bg-amber-500 text-white font-bold text-xs shadow-md hover:bg-amber-600 transition-colors cursor-pointer"
+              >
+                Limpar Filtros e Ver Todas
+              </button>
+            )}
           </div>
         ) : (
           filteredOperators.map((op, index) => {
@@ -341,7 +537,7 @@ export const LayerRankingTable: React.FC<LayerRankingTableProps> = ({
                   </div>
                 </div>
 
-                {/* 4. TOTAL DE PRODUTIVIDADE (NÚMERO 3D EM DESTAQUE) */}
+                {/* 4. PRODUTIVIDADE = QTD. SERV. (NÚMERO 3D EM DESTAQUE) */}
                 <div className="text-right font-black text-[16px] text-slate-900 tracking-tight font-heading drop-shadow-xs">
                   {formatNumber(op.totalProductivity)}
                 </div>
@@ -398,9 +594,9 @@ export const LayerRankingTable: React.FC<LayerRankingTableProps> = ({
       <div className="pt-2.5 px-2 flex items-center justify-between text-[11.5px] font-bold text-slate-500 border-t border-slate-200/60 mt-1">
         <span className="flex items-center gap-1.5">
           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          Exibindo {filteredOperators.length} de {operators.length} colaboradores
+          Exibindo {filteredOperators.length} colaboradores na atividade {selectedActivity !== 'TODAS AS ATIVIDADES' ? `"${selectedActivity}"` : 'geral'}
         </span>
-        <span className="text-[11px] font-semibold text-slate-400">Clique em qualquer colaborador para destacar no pódio 3D</span>
+        <span className="text-[11px] font-semibold text-slate-400">Produtividade calculada com base na coluna Qtd. Serv. do PDF</span>
       </div>
     </div>
   );
