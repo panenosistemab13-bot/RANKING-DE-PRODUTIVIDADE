@@ -107,12 +107,12 @@ export const LayerRankingTable: React.FC<LayerRankingTableProps> = ({
         const sumItens = registrosFiltrados.reduce((t, r) => t + r.qtdItens, 0);
         const sumEnd = registrosFiltrados.reduce((t, r) => t + r.qtdEnd, 0);
 
-        const totalMov = sumOrdens + sumPecas + sumLotes;
+        const totalMov = sumServ + sumPecas + sumLotes;
 
         return {
           ...colab,
-          totalProductivity: sumServ, // PRODUTIVIDADE = Qtd. Serv.
-          movements: totalMov > 0 ? totalMov : (sumOrdens || registrosFiltrados.length),
+          totalProductivity: sumOrdens, // PRODUTIVIDADE = Qtd. Ordens
+          movements: totalMov > 0 ? totalMov : (sumServ || registrosFiltrados.length),
           qtdOrdens: sumOrdens,
           qtdPecas: sumPecas,
           qtdLotes: sumLotes,
@@ -263,7 +263,7 @@ export const LayerRankingTable: React.FC<LayerRankingTableProps> = ({
             <h3 className="text-[21px] font-black tracking-tight text-[#0f2444] uppercase font-heading drop-shadow-xs flex items-center gap-2">
               RANKING COMPLETO
               <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-slate-900 text-amber-400 tracking-widest border border-slate-800">
-                PRODUTIVIDADE SAGA (QTD. SERV.)
+                PRODUTIVIDADE SAGA (QTD. ORDENS)
               </span>
             </h3>
 
@@ -445,7 +445,7 @@ export const LayerRankingTable: React.FC<LayerRankingTableProps> = ({
         </div>
         <div>COLABORADOR</div>
         <div className="px-2">DESEMPENHO RELATIVO</div>
-        <div className="text-right">PRODUTIVIDADE (QTD. SERV.)</div>
+        <div className="text-right">PRODUTIVIDADE (QTD. ORDENS)</div>
         <div className="text-center">MOVIMENTAÇÕES</div>
         <div className="text-center">PARTICIPAÇÃO</div>
         <div className="text-center flex items-center justify-center gap-1">
@@ -596,7 +596,7 @@ export const LayerRankingTable: React.FC<LayerRankingTableProps> = ({
           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
           Exibindo {filteredOperators.length} colaboradores na atividade {selectedActivity !== 'TODAS AS ATIVIDADES' ? `"${selectedActivity}"` : 'geral'}
         </span>
-        <span className="text-[11px] font-semibold text-slate-400">Produtividade calculada com base na coluna Qtd. Serv. do PDF</span>
+        <span className="text-[11px] font-semibold text-slate-400">Produtividade calculada com base na coluna Qtd. Ordens do PDF</span>
       </div>
     </div>
   );

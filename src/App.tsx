@@ -143,15 +143,15 @@ export default function App() {
             return false;
           });
 
-          const sumServ = matching.reduce((t, r) => t + r.qtdServ, 0);
           const sumOrdens = matching.reduce((t, r) => t + r.qtdOrdens, 0);
+          const sumServ = matching.reduce((t, r) => t + r.qtdServ, 0);
           const sumPecas = matching.reduce((t, r) => t + r.qtdPecas, 0);
           const sumLotes = matching.reduce((t, r) => t + r.qtdLotes, 0);
 
           return {
             ...colab,
-            totalProductivity: sumServ,
-            movements: sumOrdens + sumPecas + sumLotes || sumOrdens || matching.length,
+            totalProductivity: sumOrdens,
+            movements: sumServ + sumPecas + sumLotes || sumServ || matching.length,
             registros: matching.length,
           };
         }

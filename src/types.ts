@@ -16,8 +16,8 @@ export interface RawProductivityEntry {
 export interface OperatorSummary {
   rank: number;
   name: string;
-  totalProductivity: number; // Qtd. Serv. (Produtividade Principal do SAGA)
-  movements: number; // Movimentações (Qtd. Ordens + Peças + Lotes)
+  totalProductivity: number; // Qtd. Ordens (Produtividade Principal do SAGA)
+  movements: number; // Movimentações (Qtd. Serv. + Peças + Lotes)
   participation: number; // % de participação no total
   trendGrowth: number;  // Tendência
   sparkline: number[];  // Mini gráfico de evolução

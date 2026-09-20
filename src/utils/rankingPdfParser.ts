@@ -20,10 +20,10 @@ export interface RankingRow {
 
 export interface RankingColaborador {
   nome: string;
-  qtdOrdens: number;
+  qtdOrdens: number; // PRODUTIVIDADE = Qtd. Ordens
   qtdPecas: number;
   qtdLotes: number;
-  qtdServ: number; // PRODUTIVIDADE = Qtd. Serv.
+  qtdServ: number;
   qtdItens: number;
   qtdEnd: number;
   registros: number;
@@ -120,13 +120,13 @@ export function filtrarRanking(
      */
 
     const somas = {
+      /*
+       * ESTE É O CAMPO PRINCIPAL.
+       * PRODUTIVIDADE = Qtd. Ordens
+       */
       qtdOrdens: registrosFiltrados.reduce((total, r) => total + r.qtdOrdens, 0),
       qtdPecas: registrosFiltrados.reduce((total, r) => total + r.qtdPecas, 0),
       qtdLotes: registrosFiltrados.reduce((total, r) => total + r.qtdLotes, 0),
-      /*
-       * ESTE É O CAMPO PRINCIPAL.
-       * PRODUTIVIDADE = Qtd. Serv.
-       */
       qtdServ: registrosFiltrados.reduce((total, r) => total + r.qtdServ, 0),
       qtdItens: registrosFiltrados.reduce((total, r) => total + r.qtdItens, 0),
       qtdEnd: registrosFiltrados.reduce((total, r) => total + r.qtdEnd, 0),
@@ -154,13 +154,13 @@ export function filtrarRanking(
   /*
    * ORDENAÇÃO
    *
-   * Produtividade = Qtd. Serv.
+   * Produtividade = Qtd. Ordens
    */
 
   if (ordenacao === "produtividade") {
     resultado.sort((a, b) => {
-      if (b.qtdServ !== a.qtdServ) {
-        return b.qtdServ - a.qtdServ;
+      if (b.qtdOrdens !== a.qtdOrdens) {
+        return b.qtdOrdens - a.qtdOrdens;
       }
 
       /*
@@ -177,8 +177,8 @@ export function filtrarRanking(
      * Ordenação por movimentações.
      */
     resultado.sort((a, b) => {
-      const movA = a.qtdOrdens + a.qtdPecas + a.qtdLotes;
-      const movB = b.qtdOrdens + b.qtdPecas + b.qtdLotes;
+      const movA = a.qtdServ + a.qtdPecas + a.qtdLotes;
+      const movB = b.qtdServ + b.qtdPecas + b.qtdLotes;
 
       if (movB !== movA) {
         return movB - movA;
@@ -198,12 +198,12 @@ export function filtrarRanking(
    * RECALCULA O PERCENTUAL E AS POSIÇÕES.
    */
 
-  const totalProdutividade = resultado.reduce((soma, c) => soma + c.qtdServ, 0);
+  const totalProdutividade = resultado.reduce((soma, c) => soma + c.qtdOrdens, 0);
 
   return resultado.map((colaborador, index) => ({
     ...colaborador,
     posicao: index + 1,
-    percentual: totalProdutividade > 0 ? (colaborador.qtdServ / totalProdutividade) * 100 : 0,
+    percentual: totalProdutividade > 0 ? (colaborador.qtdOrdens / totalProdutividade) * 100 : 0,
   }));
 }
 
@@ -498,25 +498,25 @@ export async function lerRankingProdutividade(
   const colaboradores = Array.from(mapa.values());
 
   /* =======================================================
-     ORDENAÇÃO INICIAL POR Qtd. Serv. (PRODUTIVIDADE)
+     ORDENAÇÃO INICIAL POR Qtd. Ordens (PRODUTIVIDADE)
   ======================================================= */
 
   colaboradores.sort((a, b) => {
-    if (b.qtdServ !== a.qtdServ) {
-      return b.qtdServ - a.qtdServ;
+    if (b.qtdOrdens !== a.qtdOrdens) {
+      return b.qtdOrdens - a.qtdOrdens;
     }
     return a.nome.localeCompare(b.nome, "pt-BR", { sensitivity: "base" });
   });
 
-  const totalServ = colaboradores.reduce(
-    (soma, colaborador) => soma + colaborador.qtdServ,
+  const totalOrdens = colaboradores.reduce(
+    (soma, colaborador) => soma + colaborador.qtdOrdens,
     0
   );
 
   colaboradores.forEach((colaborador, index) => {
     colaborador.posicao = index + 1;
     colaborador.percentual =
-      totalServ > 0 ? (colaborador.qtdServ / totalServ) * 100 : 0;
+      totalOrdens > 0 ? (colaborador.qtdOrdens / totalOrdens) * 100 : 0;
   });
 
   const atividades = Array.from(

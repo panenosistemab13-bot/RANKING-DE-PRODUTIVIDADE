@@ -40,14 +40,14 @@ export const DataImportExportModal: React.FC<DataImportExportModalProps> = ({
   const processRankingResult = async (result: RankingPdfResult, fileName: string) => {
     // Convert RankingColaborador[] to OperatorSummary[]
     const parsedOperators: OperatorSummary[] = result.colaboradores.map((colab, idx) => {
-      // Calculate activities map using Qtd. Serv. (produtividade real)
+      // Calculate activities map using Qtd. Ordens (produtividade real)
       const activitiesMap: Record<string, number> = {};
       const colabRows = (colab.registrosDetalhados && colab.registrosDetalhados.length > 0)
         ? colab.registrosDetalhados
         : result.linhas.filter(l => l.colaborador.toUpperCase() === colab.nome.toUpperCase());
 
       colabRows.forEach(l => {
-        activitiesMap[l.atividade] = (activitiesMap[l.atividade] || 0) + (l.qtdServ || 0);
+        activitiesMap[l.atividade] = (activitiesMap[l.atividade] || 0) + (l.qtdOrdens || 0);
       });
 
       // Find top activity
@@ -63,9 +63,9 @@ export const DataImportExportModal: React.FC<DataImportExportModalProps> = ({
       // Generate sparkline values based on daily entries or smoothed distribution
       let sparkline: number[] = [];
       if (colabRows.length >= 3) {
-        sparkline = colabRows.map(r => r.qtdServ || r.qtdOrdens || 1);
+        sparkline = colabRows.map(r => r.qtdOrdens || r.qtdServ || 1);
       } else {
-        const base = colab.qtdServ || colab.qtdOrdens || 10;
+        const base = colab.qtdOrdens || colab.qtdServ || 10;
         sparkline = [
           Math.round(base * 0.12),
           Math.round(base * 0.14),
@@ -77,18 +77,18 @@ export const DataImportExportModal: React.FC<DataImportExportModalProps> = ({
         ];
       }
 
-      const totalMov = (colab.qtdOrdens || 0) + (colab.qtdPecas || 0) + (colab.qtdLotes || 0);
+      const totalMov = (colab.qtdServ || 0) + (colab.qtdPecas || 0) + (colab.qtdLotes || 0);
 
       return {
         rank: idx + 1,
         name: colab.nome,
-        totalProductivity: colab.qtdServ, // Qtd. Serv.
-        movements: totalMov > 0 ? totalMov : (colab.qtdOrdens || colab.registros || 1),
+        totalProductivity: colab.qtdOrdens, // Qtd. Ordens
+        movements: totalMov > 0 ? totalMov : (colab.qtdServ || colab.registros || 1),
         participation: +colab.percentual.toFixed(2),
         trendGrowth: +(7.5 + (idx < 5 ? 2.4 : -1.2)).toFixed(1),
         sparkline,
         topActivity: topAct,
-        activitiesCount: Object.keys(activitiesMap).length > 0 ? activitiesMap : { [topAct]: colab.qtdServ },
+        activitiesCount: Object.keys(activitiesMap).length > 0 ? activitiesMap : { [topAct]: colab.qtdOrdens },
         qtdOrdens: colab.qtdOrdens,
         qtdPecas: colab.qtdPecas,
         qtdLotes: colab.qtdLotes,
