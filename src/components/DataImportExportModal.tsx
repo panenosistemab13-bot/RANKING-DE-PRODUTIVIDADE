@@ -1,10 +1,12 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { X, UploadCloud, AlertCircle, FileSpreadsheet, RefreshCw, CheckCircle2, FileText, Loader2, Database } from 'lucide-react';
 import { OperatorSummary, PeriodPreset } from '../types';
 import { lerRankingProdutividade, lerRankingUMA, RankingPdfResult, parseDataBRTimestamp } from '../utils/rankingPdfParser';
 import { obterTurnoColaborador } from '../utils/turnos';
 import { salvarRankingRealtime, salvarHistoricoImportacao, limparRankingRealtime } from '../services/firebase';
 import * as XLSX from 'xlsx';
+import { googleSignIn, logout as googleLogout, initAuth, getCurrentUser } from '../services/googleAuth';
+import { exportarRankingParaSheets, importarRankingDeSheets, extrairSpreadsheetId } from '../services/googleSheets';
 
 interface DataImportExportModalProps {
   isOpen: boolean;
@@ -18,9 +20,10 @@ interface DataImportExportModalProps {
 export const DataImportExportModal: React.FC<DataImportExportModalProps> = ({
   isOpen,
   onClose,
+  operators = [],
   onImportCustomData
 }) => {
-  const [activeTab, setActiveTab] = useState<'SAGA' | 'UMA'>('SAGA');
+  const [activeTab, setActiveTab] = useState<'SAGA' | 'UMA' | 'SHEETS'>('SAGA');
   const [pasteText, setPasteText] = useState('');
   const [importStatus, setImportStatus] = useState<string | null>(null);
   const [isLoadingPdf, setIsLoadingPdf] = useState(false);
@@ -28,6 +31,32 @@ export const DataImportExportModal: React.FC<DataImportExportModalProps> = ({
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const fileInputUmaRef = useRef<HTMLInputElement>(null);
+
+  // Estados do Google Sheets
+  const [gUser, setGUser] = useState<any>(null);
+  const [spreadsheetUrl, setSpreadsheetUrl] = useState('');
+  const [isProcessingSheets, setIsProcessingSheets] = useState(false);
+  const [createdSheetUrl, setCreatedSheetUrl] = useState<string | null>(null);
+
+  // Inicializa o listener do Google Auth
+  useEffect(() => {
+    if (isOpen) {
+      const unsubscribe = initAuth(
+        (user) => {
+          setGUser(user);
+        },
+        () => {
+          setGUser(null);
+        }
+      );
+      // Se já houver usuário logado no Firebase Auth
+      const currentUser = getCurrentUser();
+      if (currentUser) {
+        setGUser(currentUser);
+      }
+      return () => unsubscribe();
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -299,6 +328,82 @@ export const DataImportExportModal: React.FC<DataImportExportModalProps> = ({
     }
   };
 
+  const handleGoogleLogin = async () => {
+    setImportStatus(null);
+    try {
+      const res = await googleSignIn();
+      if (res) {
+        setGUser(res.user);
+        setImportStatus(`Conectado com sucesso como: ${res.user.email}`);
+      }
+    } catch (err: any) {
+      setImportStatus(`Falha ao conectar com o Google: ${err.message || err}`);
+    }
+  };
+
+  const handleGoogleLogout = async () => {
+    try {
+      await googleLogout();
+      setGUser(null);
+      setCreatedSheetUrl(null);
+      setImportStatus("Desconectado da conta do Google.");
+    } catch (err: any) {
+      setImportStatus(`Erro ao desconectar: ${err.message || err}`);
+    }
+  };
+
+  const handleExportToSheets = async () => {
+    if (!operators || operators.length === 0) {
+      setImportStatus("Não há dados de ranking para exportar.");
+      return;
+    }
+    setIsProcessingSheets(true);
+    setCreatedSheetUrl(null);
+    setImportStatus("Criando nova planilha e exportando dados do ranking...");
+    try {
+      const title = `SAGA - Ranking de Produtividade (${new Date().toLocaleDateString('pt-BR')})`;
+      const spreadsheetId = await exportarRankingParaSheets(title, operators);
+      const url = `https://docs.google.com/spreadsheets/d/${spreadsheetId}`;
+      setCreatedSheetUrl(url);
+      setImportStatus("Exportação concluída com sucesso!");
+    } catch (err: any) {
+      console.error(err);
+      setImportStatus(`Erro ao exportar para o Google Sheets: ${err.message || err}`);
+    } finally {
+      setIsProcessingSheets(false);
+    }
+  };
+
+  const handleImportFromSheets = async () => {
+    if (!spreadsheetUrl.trim()) {
+      setImportStatus("Por favor, insira o link ou o ID da planilha do Google Sheets.");
+      return;
+    }
+    setIsProcessingSheets(true);
+    setImportStatus("Conectando à planilha e importando dados...");
+    try {
+      const id = extrairSpreadsheetId(spreadsheetUrl.trim());
+      const parsed = await importarRankingDeSheets(id);
+      
+      const label = `importado via Google Sheets em ${new Date().toLocaleDateString('pt-BR')}`;
+      onImportCustomData(parsed, label);
+      
+      // Salva no Firebase RTDB
+      await salvarRankingRealtime(parsed, label, "02/01/2026", "20/09/2026");
+      
+      setImportStatus(`Sucesso! ${parsed.length} colaboradores importados da planilha e sincronizados.`);
+      setSpreadsheetUrl('');
+      setTimeout(() => {
+        onClose();
+      }, 1500);
+    } catch (err: any) {
+      console.error(err);
+      setImportStatus(`Erro ao importar da planilha: ${err.message || err}`);
+    } finally {
+      setIsProcessingSheets(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-slate-950/70 backdrop-blur-md animate-in fade-in duration-200">
       <div className="w-full max-w-3xl rounded-[32px] bg-white border border-slate-200 shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
@@ -359,132 +464,306 @@ export const DataImportExportModal: React.FC<DataImportExportModalProps> = ({
             <FileSpreadsheet className="w-4 h-4" />
             Importar U.M.A. (PDF para Excel)
           </button>
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab('SHEETS');
+              setPdfResult(null);
+              setImportStatus(null);
+            }}
+            className={`pb-3 px-4 text-xs font-bold border-b-2 flex items-center gap-2 cursor-pointer transition-colors ${
+              activeTab === 'SHEETS'
+                ? 'border-amber-500 text-amber-600 font-black'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <Database className="w-4 h-4" />
+            Google Sheets (Nuvem)
+          </button>
         </div>
 
         {/* Body */}
         <div className="p-8 overflow-y-auto flex-1">
-          <div className="space-y-4">
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleFileInputChange}
-              accept="application/pdf,.pdf,.csv,.txt,.xlsx,.xls"
-              className="hidden"
-            />
-            <div
-              onClick={() => fileInputRef.current?.click()}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-              className={`p-8 rounded-2xl border-2 border-dashed flex flex-col items-center justify-center text-center cursor-pointer transition-all ${
-                isDragging
-                  ? 'border-amber-500 bg-amber-50/60 scale-[1.01]'
-                  : 'border-slate-300 hover:border-amber-400 bg-slate-50/50'
-              }`}
-            >
-              {isLoadingPdf ? (
-                <div className="flex flex-col items-center gap-2 py-4">
-                  <Loader2 className="w-10 h-10 text-amber-500 animate-spin" />
-                  <p className="text-sm font-black text-slate-800">
-                    {activeTab === 'UMA'
-                      ? 'Processando relatório de U.M.A. e gerando Excel...'
-                      : 'Processando todas as páginas do PDF com PDF.js...'}
-                  </p>
-                  <p className="text-xs text-slate-500">
-                    {activeTab === 'UMA'
-                      ? 'Extraindo dados tabulares de U.M.A. Origem e gerando planilha convertida...'
-                      : 'Consolidando registros de datas e somando produtividades reais.'}
-                  </p>
+          {activeTab === 'SHEETS' ? (
+            <div className="space-y-6">
+              {/* Header informativo */}
+              <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-900 space-y-1">
+                <div className="flex items-center gap-2 font-black text-amber-800 text-sm">
+                  <Database className="w-4 h-4 text-amber-600" />
+                  Sincronização com Google Sheets
+                </div>
+                <p className="font-medium text-slate-700">
+                  Conecte sua conta do Google para importar planilhas ou exportar o ranking atual diretamente para a sua nuvem do Google Drive.
+                </p>
+              </div>
+
+              {/* Login Status */}
+              {!gUser ? (
+                <div className="flex flex-col items-center justify-center p-8 border border-dashed border-slate-300 rounded-2xl bg-slate-50/50 text-center space-y-4">
+                  <Database className="w-12 h-12 text-slate-400" />
+                  <div>
+                    <p className="text-sm font-bold text-slate-800 font-heading">Conexão com Google Pendente</p>
+                    <p className="text-xs text-slate-500 max-w-sm mt-1">
+                      É necessário fazer login com o Google e permitir o acesso aos arquivos de planilhas para utilizar esta funcionalidade.
+                    </p>
+                  </div>
+                  {/* Botão GSI */}
+                  <button
+                    type="button"
+                    onClick={handleGoogleLogin}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl shadow-sm cursor-pointer transition-colors"
+                  >
+                    <svg className="w-4 h-4 shrink-0" version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+                      <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"></path>
+                      <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"></path>
+                      <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"></path>
+                      <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"></path>
+                    </svg>
+                    Conectar Conta Google
+                  </button>
                 </div>
               ) : (
-                <>
-                  <UploadCloud className="w-12 h-12 text-amber-500 mb-2" />
-                  <p className="text-base font-bold text-slate-800">
-                    {activeTab === 'UMA'
-                      ? 'Selecione ou Arraste o Relatório de U.M.A. em PDF'
-                      : 'Selecione ou Arraste o Relatório PDF Oficial do SAGA'}
-                  </p>
-                  <p className="text-xs text-slate-500 mt-1 max-w-md">
-                    {activeTab === 'UMA'
-                      ? 'O parser lê o PDF de U.M.A., separa o ranking pela coluna "UMA Origem", gera e baixa automaticamente o Excel correspondente, e substitui integralmente todas as informações do dashboard.'
-                      : 'O parser lê automaticamente todas as páginas do PDF, somando a coluna "qtd. Ordens", identificando os turnos (A, B, C, ADM, RANDS) e substituindo integralmente todos os dados anteriores.'}
-                  </p>
-                  <span className="mt-3 px-3 py-1 bg-amber-100 text-amber-900 rounded-full text-[11px] font-bold">
-                    {activeTab === 'UMA' ? 'Conversão Excel Automática • Substituição Total' : 'Substituição Total • Realtime Database Sincronizado'}
-                  </span>
-                </>
+                <div className="space-y-6">
+                  {/* Usuário Conectado */}
+                  <div className="flex items-center justify-between p-4 bg-slate-50 border border-slate-200 rounded-2xl">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-amber-500 text-white font-black text-sm flex items-center justify-center shadow-inner">
+                        {gUser.email?.[0]?.toUpperCase() || 'G'}
+                      </div>
+                      <div>
+                        <p className="text-xs text-slate-500 font-medium animate-pulse">Conectado como</p>
+                        <p className="text-sm font-bold text-slate-800">{gUser.email}</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleGoogleLogout}
+                      className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                    >
+                      Desconectar
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Seção Importar */}
+                    <div className="p-5 border border-slate-150 rounded-2xl bg-white space-y-3 flex flex-col justify-between">
+                      <div className="space-y-3">
+                        <h4 className="text-sm font-black text-slate-900 flex items-center gap-2">
+                          <UploadCloud className="w-4 h-4 text-amber-500" />
+                          Importar de Planilha
+                        </h4>
+                        <p className="text-xs text-slate-500 font-medium leading-relaxed">
+                          Insira o ID ou link de uma planilha Google Sheets de sua conta. O cabeçalho deve possuir uma coluna que contenha "Colaborador" ou "Nome", e outra com "Produtividade".
+                        </p>
+                      </div>
+                      <div className="space-y-2 pt-1">
+                        <input
+                          type="text"
+                          placeholder="Cole o link ou ID da planilha Google Sheets..."
+                          value={spreadsheetUrl}
+                          onChange={(e) => setSpreadsheetUrl(e.target.value)}
+                          disabled={isProcessingSheets}
+                          className="w-full p-2.5 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500 text-slate-800 bg-white"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleImportFromSheets}
+                          disabled={isProcessingSheets}
+                          className="w-full py-2.5 bg-amber-500 hover:bg-amber-600 disabled:bg-slate-200 text-white disabled:text-slate-400 rounded-xl text-xs font-bold shadow-sm flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                        >
+                          {isProcessingSheets ? (
+                            <>
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              Processando...
+                            </>
+                          ) : (
+                            <>
+                              <Database className="w-3.5 h-3.5" />
+                              Importar Planilha
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Seção Exportar */}
+                    <div className="p-5 border border-slate-150 rounded-2xl bg-white space-y-3 flex flex-col justify-between">
+                      <div className="space-y-3">
+                        <h4 className="text-sm font-black text-slate-900 flex items-center gap-2">
+                          <FileSpreadsheet className="w-4 h-4 text-emerald-500" />
+                          Exportar para Planilha
+                        </h4>
+                        <p className="text-xs text-slate-500 font-medium leading-relaxed">
+                          Cria instantaneamente uma nova planilha Google Sheets em seu Google Drive e exporta o ranking e as estatísticas de produtividade de todos os colaboradores ativos do dashboard.
+                        </p>
+                      </div>
+                      <div className="space-y-2 pt-2">
+                        <button
+                          type="button"
+                          onClick={handleExportToSheets}
+                          disabled={isProcessingSheets || !operators || operators.length === 0}
+                          className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-200 text-white disabled:text-slate-400 rounded-xl text-xs font-bold shadow-sm flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                        >
+                          {isProcessingSheets ? (
+                            <>
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              Criando Planilha...
+                            </>
+                          ) : (
+                            <>
+                              <FileSpreadsheet className="w-3.5 h-3.5" />
+                              Exportar Ranking Atual
+                            </>
+                          )}
+                        </button>
+                        
+                        {createdSheetUrl && (
+                          <a
+                            href={createdSheetUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="block text-center py-2.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-bold transition-all animate-bounce"
+                          >
+                            Ver Planilha no Google Drive ↗
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {importStatus && (
+                <div className="p-3 rounded-xl bg-slate-100 text-xs font-medium text-slate-700 flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>{importStatus}</span>
+                </div>
               )}
             </div>
-
-            {pdfResult && (
-              <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-900 space-y-1">
-                <div className="flex items-center gap-2 font-black text-emerald-800 text-sm">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  PDF Processado com Sucesso!
-                </div>
-                <div className="grid grid-cols-4 gap-2 pt-1 font-medium">
-                  <div><strong>Páginas:</strong> {pdfResult.totalPaginas}</div>
-                  <div><strong>Registros:</strong> {pdfResult.totalRegistros}</div>
-                  <div><strong>Colaboradores:</strong> {pdfResult.totalColaboradores}</div>
-                  <div><strong>Atividades:</strong> {pdfResult.atividades.length}</div>
-                </div>
-              </div>
-            )}
-
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                Ou Cole Linhas de Dados (Formato: Nome ; Produtividade ; Movimentações)
-              </label>
-              <textarea
-                rows={4}
-                placeholder={`LUAN MARTINS; 5234; 48\nGABRIEL YGOR; 4982; 42\nMARCELINO RIBEIRO; 4761; 39\nANTHONY RODRIGO; 4502; 36`}
-                value={pasteText}
-                onChange={(e) => setPasteText(e.target.value)}
-                className="w-full p-3 text-xs font-mono rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500 text-slate-800 bg-white"
+          ) : (
+            <div className="space-y-4">
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileInputChange}
+                accept="application/pdf,.pdf,.csv,.txt,.xlsx,.xls"
+                className="hidden"
               />
-            </div>
-
-            {importStatus && (
-              <div className="p-3 rounded-xl bg-slate-100 text-xs font-medium text-slate-700 flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
-                <span>{importStatus}</span>
-              </div>
-            )}
-
-            <div className="flex items-center justify-between pt-2">
-              <button
-                type="button"
-                onClick={handleClearAllData}
-                className="px-4 py-2 text-xs font-bold rounded-xl text-red-600 hover:bg-red-50 border border-red-200 cursor-pointer transition-colors"
-                title="Limpar todos os dados do Firebase Realtime e LocalStorage"
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                className={`p-8 rounded-2xl border-2 border-dashed flex flex-col items-center justify-center text-center cursor-pointer transition-all ${
+                  isDragging
+                    ? 'border-amber-500 bg-amber-50/60 scale-[1.01]'
+                    : 'border-slate-300 hover:border-amber-400 bg-slate-50/50'
+                }`}
               >
-                Limpar Banco / Resetar Dados
-              </button>
+                {isLoadingPdf ? (
+                  <div className="flex flex-col items-center gap-2 py-4">
+                    <Loader2 className="w-10 h-10 text-amber-500 animate-spin" />
+                    <p className="text-sm font-black text-slate-800">
+                      {activeTab === 'UMA'
+                        ? 'Processando relatório de U.M.A. e gerando Excel...'
+                        : 'Processando todas as páginas do PDF com PDF.js...'}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      {activeTab === 'UMA'
+                        ? 'Extraindo dados tabulares de U.M.A. Origem e gerando planilha convertida...'
+                        : 'Consolidando registros de datas e somando produtividades reais.'}
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <UploadCloud className="w-12 h-12 text-amber-500 mb-2" />
+                    <p className="text-base font-bold text-slate-800">
+                      {activeTab === 'UMA'
+                        ? 'Selecione ou Arraste o Relatório de U.M.A. em PDF'
+                        : 'Selecione ou Arraste o Relatório PDF Oficial do SAGA'}
+                    </p>
+                    <p className="text-xs text-slate-500 mt-1 max-w-md">
+                      {activeTab === 'UMA'
+                        ? 'O parser lê o PDF de U.M.A., separa o ranking pela coluna "UMA Origem", gera e baixa automaticamente o Excel correspondente, e substitui integralmente todas as informações do dashboard.'
+                        : 'O parser lê automaticamente todas as páginas do PDF, somando a coluna "qtd. Ordens", identificando os turnos (A, B, C, ADM, RANDS) e substituindo integralmente todos os dados anteriores.'}
+                    </p>
+                    <span className="mt-3 px-3 py-1 bg-amber-100 text-amber-900 rounded-full text-[11px] font-bold">
+                      {activeTab === 'UMA' ? 'Conversão Excel Automática • Substituição Total' : 'Substituição Total • Realtime Database Sincronizado'}
+                    </span>
+                  </>
+                )}
+              </div>
 
-              <div className="flex items-center gap-3">
+              {pdfResult && (
+                <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-900 space-y-1">
+                  <div className="flex items-center gap-2 font-black text-emerald-800 text-sm">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                    PDF Processado com Sucesso!
+                  </div>
+                  <div className="grid grid-cols-4 gap-2 pt-1 font-medium">
+                    <div><strong>Páginas:</strong> {pdfResult.totalPaginas}</div>
+                    <div><strong>Registros:</strong> {pdfResult.totalRegistros}</div>
+                    <div><strong>Colaboradores:</strong> {pdfResult.totalColaboradores}</div>
+                    <div><strong>Atividades:</strong> {pdfResult.atividades.length}</div>
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                  Ou Cole Linhas de Dados (Formato: Nome ; Produtividade ; Movimentações)
+                </label>
+                <textarea
+                  rows={4}
+                  placeholder={`LUAN MARTINS; 5234; 48\nGABRIEL YGOR; 4982; 42\nMARCELINO RIBEIRO; 4761; 39\nANTHONY RODRIGO; 4502; 36`}
+                  value={pasteText}
+                  onChange={(e) => setPasteText(e.target.value)}
+                  className="w-full p-3 text-xs font-mono rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500 text-slate-800 bg-white"
+                />
+              </div>
+
+              {importStatus && (
+                <div className="p-3 rounded-xl bg-slate-100 text-xs font-medium text-slate-700 flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>{importStatus}</span>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between pt-2">
                 <button
                   type="button"
-                  onClick={() => {
-                    setPasteText('');
-                    setPdfResult(null);
-                    setImportStatus(null);
-                  }}
-                  className="px-4 py-2 text-xs font-bold rounded-xl text-slate-600 hover:bg-slate-100 cursor-pointer"
+                  onClick={handleClearAllData}
+                  className="px-4 py-2 text-xs font-bold rounded-xl text-red-600 hover:bg-red-50 border border-red-200 cursor-pointer transition-colors"
+                  title="Limpar todos os dados do Firebase Realtime e LocalStorage"
                 >
-                  Limpar Campos
+                  Limpar Banco / Resetar Dados
                 </button>
-                <button
-                  type="button"
-                  onClick={handleProcessImport}
-                  disabled={isLoadingPdf}
-                  className="px-6 py-2.5 text-xs font-bold rounded-xl bg-amber-500 hover:bg-amber-600 text-white shadow-md shadow-amber-500/30 flex items-center gap-2 cursor-pointer transition-colors disabled:opacity-50"
-                >
-                  <RefreshCw className="w-3.5 h-3.5" />
-                  Atualizar Dashboard com Estes Dados
-                </button>
+
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPasteText('');
+                      setPdfResult(null);
+                      setImportStatus(null);
+                    }}
+                    className="px-4 py-2 text-xs font-bold rounded-xl text-slate-600 hover:bg-slate-100 cursor-pointer"
+                  >
+                    Limpar Campos
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleProcessImport}
+                    disabled={isLoadingPdf}
+                    className="px-6 py-2.5 text-xs font-bold rounded-xl bg-amber-500 hover:bg-amber-600 text-white shadow-md shadow-amber-500/30 flex items-center gap-2 cursor-pointer transition-colors disabled:opacity-50"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    Atualizar Dashboard com Estes Dados
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </div>

@@ -781,6 +781,7 @@ export async function lerRankingUMA(
 
   const rawRows: UmaParsedRow[] = [];
   const registros: RankingRow[] = [];
+  const uniqueEmployeeUmas = new Set<string>(); // "funcionarioNome|umaOrigem"
 
   for (let pageIndex = 0; pageIndex < paginasLinhas.length; pageIndex++) {
     const pageNum = pageIndex + 1;
@@ -884,7 +885,16 @@ export async function lerRankingUMA(
       }
       if (idxEmployeeCode === -1) continue;
 
-      const funcionarioNome = tokens.slice(idxEmployeeCode + 1, idxDate).join(" ");
+      const funcionarioNome = tokens.slice(idxEmployeeCode + 1, idxDate).join(" ").trim().toUpperCase();
+      if (!funcionarioNome) continue;
+
+      // REQUISITO CRÍTICO DE DEDUPLICAÇÃO DE UMA:
+      // Se o mesmo código de "UMA ORIGEM" aparecer mais de uma vez para o mesmo funcionário, desconsidere.
+      const keyCombo = `${funcionarioNome}|${umaOrigem.toUpperCase().trim()}`;
+      if (uniqueEmployeeUmas.has(keyCombo)) {
+        continue;
+      }
+      uniqueEmployeeUmas.add(keyCombo);
 
       // Extrai os endereços
       const addressTokens = tokens.slice(idxSkuPadrao + 1, idxEmployeeCode);
@@ -919,15 +929,15 @@ export async function lerRankingUMA(
         dataHora
       });
 
-      // Cria a linha de ranking (Usando a UMA ORIGEM como identificador do colaborador)
+      // Cria a linha de ranking (Identificando o colaborador pela Coluna Y "FUNCIONARIO")
       registros.push({
         pagina: pageNum,
         atividade,
-        colaborador: umaOrigem, // Chave do ranking
-        qtdOrdens: 1,
+        colaborador: funcionarioNome, // Chave do ranking (FUNCIONARIO)
+        qtdOrdens: 1, // Cada UMA única conta como 1 Ordem/Serviço
         qtdPecas: qtdMer,
         qtdLotes: 1,
-        qtdServ: 1,
+        qtdServ: 1, // 1 Serviço por UMA única
         qtdItens: 1,
         qtdEnd: 1,
         data,
@@ -939,7 +949,7 @@ export async function lerRankingUMA(
   }
 
   /* =======================================================
-     AGRUPAMENTO DOS COLABORADORES (PELA UMA ORIGEM)
+     AGRUPAMENTO DOS COLABORADORES (PELO FUNCIONÁRIO)
   ======================================================= */
 
   const mapa = new Map<string, RankingColaborador>();
@@ -951,8 +961,8 @@ export async function lerRankingUMA(
 
     if (!colab) {
       colab = {
-        nome: registro.colaborador, // UMA ORIGEM
-        turno: obterTurnoColaborador(registro.funcionarioOriginal || ""),
+        nome: registro.colaborador, // Nome do Funcionário
+        turno: obterTurnoColaborador(registro.colaborador),
         qtdOrdens: 0,
         qtdPecas: 0,
         qtdLotes: 0,
