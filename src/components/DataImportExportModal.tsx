@@ -559,7 +559,7 @@ export const DataImportExportModal: React.FC<DataImportExportModalProps> = ({
                       <div className="space-y-2 pt-1">
                         <input
                           type="text"
-                          placeholder="Cole o link ou ID da planilha Google Sheets..."
+                          placeholder="1biozb1pXF_vvISoxkeajsEr_z7prU3EkYQKZf79ja5k"
                           value={spreadsheetUrl}
                           onChange={(e) => setSpreadsheetUrl(e.target.value)}
                           disabled={isProcessingSheets}

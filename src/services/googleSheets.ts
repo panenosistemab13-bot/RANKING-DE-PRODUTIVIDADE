@@ -97,7 +97,7 @@ export async function exportarRankingParaSheets(
  */
 export async function importarRankingDeSheets(
   spreadsheetId: string,
-  rangeName = 'Sheet1!A1:Z150000'
+  rangeName = 'Sheet1!A:Z'
 ): Promise<OperatorSummary[]> {
   const token = await getAccessToken();
   if (!token) {
