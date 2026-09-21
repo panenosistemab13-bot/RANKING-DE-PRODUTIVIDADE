@@ -17,6 +17,9 @@ export interface RankingRow {
   qtdItens: number;
   qtdEnd: number;
   data: string;
+  funcionarioOriginal?: string;
+  umaOrigem?: string;
+  umaDestino?: string;
 }
 
 export interface RankingColaborador {
@@ -38,6 +41,15 @@ export interface RankingColaborador {
    * daquele colaborador para recalcular filtros perfeitamente.
    */
   registrosDetalhados: RankingRow[];
+  activitiesMetrics?: Record<string, {
+    qtdOrdens: number;
+    qtdPecas: number;
+    qtdLotes: number;
+    qtdServ: number;
+    qtdItens: number;
+    qtdEnd: number;
+    registros: number;
+  }>;
 }
 
 export interface RankingPdfResult {
@@ -605,6 +617,45 @@ export async function lerRankingProdutividade(
     colaborador.posicao = index + 1;
     colaborador.percentual =
       totalOrdens > 0 ? (colaborador.qtdOrdens / totalOrdens) * 100 : 0;
+
+    // Pré-agrupamento de métricas por atividade
+    const actMap: Record<string, {
+      qtdOrdens: number;
+      qtdPecas: number;
+      qtdLotes: number;
+      qtdServ: number;
+      qtdItens: number;
+      qtdEnd: number;
+      registros: number;
+    }> = {};
+
+    for (const r of colaborador.registrosDetalhados) {
+      const normAct = normalizarAtividade(r.atividade);
+      if (!actMap[normAct]) {
+        actMap[normAct] = {
+          qtdOrdens: 0,
+          qtdPecas: 0,
+          qtdLotes: 0,
+          qtdServ: 0,
+          qtdItens: 0,
+          qtdEnd: 0,
+          registros: 0
+        };
+      }
+      actMap[normAct].qtdOrdens += r.qtdOrdens;
+      actMap[normAct].qtdPecas += r.qtdPecas;
+      actMap[normAct].qtdLotes += r.qtdLotes;
+      actMap[normAct].qtdServ += r.qtdServ;
+      actMap[normAct].qtdItens += r.qtdItens;
+      actMap[normAct].qtdEnd += r.qtdEnd;
+      actMap[normAct].registros++;
+    }
+    colaborador.activitiesMetrics = actMap;
+
+    // Se o relatório for gigante, limpa registrosDetalhados para não sobrecarregar
+    if (registros.length > 5000) {
+      colaborador.registrosDetalhados = [];
+    }
   });
 
   const atividades = Array.from(
@@ -624,5 +675,400 @@ export async function lerRankingProdutividade(
     dataFim: intervaloDatas.dataFim,
     frasePeriodo: intervaloDatas.frasePeriodo,
     todasDatas: intervaloDatas.todasDatas,
+  };
+}
+
+/* =========================================================
+   EXTRATOR DE LINHAS TABULARES (PRESERVA COORDENADAS)
+========================================================= */
+
+async function extrairLinhasTabulares(file: File) {
+  const buffer = await file.arrayBuffer();
+
+  const pdf = await pdfjsLib.getDocument({
+    data: new Uint8Array(buffer),
+  }).promise;
+
+  const paginasLinhas: string[][] = [];
+
+  for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+    const page = await pdf.getPage(pageNum);
+    const content = await page.getTextContent();
+    
+    // Agrupa itens de texto por coordenada Y (linha física)
+    const items = content.items.map((item: any) => ({
+      str: String(item.str ?? "").trim(),
+      x: item.transform[4],
+      y: item.transform[5]
+    })).filter(item => item.str !== "");
+
+    const linesMap: { y: number; items: typeof items }[] = [];
+    for (const item of items) {
+      let placed = false;
+      for (const line of linesMap) {
+        if (Math.abs(line.y - item.y) <= 4) {
+          line.items.push(item);
+          placed = true;
+          break;
+        }
+      }
+      if (!placed) {
+        linesMap.push({ y: item.y, items: [item] });
+      }
+    }
+
+    // Ordena as linhas de cima para baixo (Y decrescente)
+    linesMap.sort((a, b) => b.y - a.y);
+
+    const lines: string[] = [];
+    for (const line of linesMap) {
+      // Ordena itens da esquerda para a direita (X crescente)
+      line.items.sort((a, b) => a.x - b.x);
+      const lineStr = line.items.map(it => it.str).join(" ");
+      lines.push(lineStr);
+    }
+
+    paginasLinhas.push(lines);
+  }
+
+  return {
+    pdf,
+    paginasLinhas
+  };
+}
+
+/* =========================================================
+   PARSER DE RELATÓRIO U.M.A. (SUPORTA MAIS DE 100.000 LINHAS)
+========================================================= */
+
+export interface UmaParsedRow {
+  lote: string;
+  prioridade: string;
+  modOper: string;
+  atividade: string;
+  situacao: string;
+  umaMista: string;
+  umaOrigem: string;
+  umaDestino: string;
+  codMercadoria: string;
+  mercadoria: string;
+  emb: number;
+  qtdMer: number;
+  total: number;
+  uv: number;
+  skuPadrao: string;
+  endOrigem: string;
+  endDestino: string;
+  endLote: string;
+  agrupamentoLote: string;
+  funcionario: string;
+  data: string;
+  dataHora: string;
+}
+
+export interface RankingUmaPdfResult extends RankingPdfResult {
+  rawRows: UmaParsedRow[];
+}
+
+export async function lerRankingUMA(
+  file: File
+): Promise<RankingUmaPdfResult> {
+  if (!file) {
+    throw new Error("Nenhum PDF foi selecionado.");
+  }
+
+  const { pdf, paginasLinhas } = await extrairLinhasTabulares(file);
+
+  const rawRows: UmaParsedRow[] = [];
+  const registros: RankingRow[] = [];
+
+  for (let pageIndex = 0; pageIndex < paginasLinhas.length; pageIndex++) {
+    const pageNum = pageIndex + 1;
+    const lines = paginasLinhas[pageIndex];
+
+    for (const line of lines) {
+      const tokens = line.trim().split(/\s+/);
+      if (tokens.length < 10) continue;
+
+      // Valida os campos estruturais obrigatórios na esquerda da linha
+      const lote = tokens[0];
+      const prioridade = tokens[1];
+      const modOper = tokens[2];
+      const atividade = tokens[3];
+      const situacao = tokens[4];
+
+      if (!/^\d+$/.test(lote)) continue;
+      if (!/^-?\d+$/.test(prioridade)) continue;
+      if (modOper !== "RF") continue;
+      if (situacao !== "FIM" && situacao !== "FIM_") continue;
+
+      // Encontra COD MERCADORIA (exatamente de 8 dígitos)
+      let idxCodMercadoria = -1;
+      for (let j = 5; j < tokens.length; j++) {
+        if (/^\d{8}$/.test(tokens[j])) {
+          idxCodMercadoria = j;
+          break;
+        }
+      }
+      if (idxCodMercadoria === -1) continue;
+
+      // Classifica os tokens entre SITUAÇÃO e COD MERCADORIA como UMA MISTA/ORIGEM/DESTINO
+      const umaTokens = tokens.slice(5, idxCodMercadoria);
+      let umaMista = "";
+      let umaOrigem = "";
+      let umaDestino = "";
+
+      if (umaTokens.length === 3) {
+        umaMista = umaTokens[0];
+        umaOrigem = umaTokens[1];
+        umaDestino = umaTokens[2];
+      } else if (umaTokens.length === 2) {
+        if (/^[A-Za-z]/.test(umaTokens[0])) {
+          umaMista = umaTokens[0];
+          umaOrigem = umaTokens[1];
+        } else {
+          umaOrigem = umaTokens[0];
+          umaDestino = umaTokens[1];
+        }
+      } else if (umaTokens.length === 1) {
+        umaOrigem = umaTokens[0];
+      }
+
+      if (!umaOrigem) continue; // Precisa ter pelo menos uma origem definida
+
+      const codMercadoria = tokens[idxCodMercadoria];
+
+      // Busca o SKU PADRÃO (primeiro token após o COD MERCADORIA que possui 3 ou mais pontos)
+      let idxSkuPadrao = -1;
+      for (let j = idxCodMercadoria + 1; j < tokens.length; j++) {
+        const dotCount = (tokens[j].match(/\./g) || []).length;
+        if (dotCount >= 3) {
+          idxSkuPadrao = j;
+          break;
+        }
+      }
+      if (idxSkuPadrao === -1 || idxSkuPadrao < idxCodMercadoria + 5) continue;
+
+      // Extrai os campos numéricos EMB, QTD MER., TOTAL e UV imediatamente anteriores ao SKU PADRÃO
+      const emb = numero(tokens[idxSkuPadrao - 4]);
+      const qtdMer = numero(tokens[idxSkuPadrao - 3]);
+      const total = numero(tokens[idxSkuPadrao - 2]);
+      const uv = numero(tokens[idxSkuPadrao - 1]);
+
+      const skuPadrao = tokens[idxSkuPadrao];
+
+      // Extrai a descrição da MERCADORIA
+      const mercadoria = tokens.slice(idxCodMercadoria + 1, idxSkuPadrao - 4).join(" ");
+
+      // Busca a primeira DATA/HORA de processamento na direita (formato DD/MM/YYYY)
+      let idxDate = -1;
+      for (let j = idxSkuPadrao + 1; j < tokens.length; j++) {
+        if (/^\d{2}\/\d{2}\/\d{4}$/.test(tokens[j])) {
+          idxDate = j;
+          break;
+        }
+      }
+      if (idxDate === -1) continue;
+
+      const data = tokens[idxDate];
+      const hora = tokens[idxDate + 1] || "";
+      const dataHora = `${data} ${hora}`;
+
+      // Identifica o código e nome do FUNCIONÁRIO (escaneando para trás a partir da data)
+      let idxEmployeeCode = -1;
+      for (let j = idxDate - 1; j > idxSkuPadrao; j--) {
+        if (/^\d+$/.test(tokens[j])) {
+          idxEmployeeCode = j;
+          break;
+        }
+      }
+      if (idxEmployeeCode === -1) continue;
+
+      const funcionarioNome = tokens.slice(idxEmployeeCode + 1, idxDate).join(" ");
+
+      // Extrai os endereços
+      const addressTokens = tokens.slice(idxSkuPadrao + 1, idxEmployeeCode);
+      const endOrigem = addressTokens[0] || "";
+      const endDestino = addressTokens[1] || "";
+      const endLote = addressTokens[2] || "";
+      const agrupamentoLote = addressTokens.slice(3).join(" ");
+
+      // Salva na lista bruta para exportação Excel
+      rawRows.push({
+        lote,
+        prioridade,
+        modOper,
+        atividade,
+        situacao,
+        umaMista,
+        umaOrigem,
+        umaDestino,
+        codMercadoria,
+        mercadoria,
+        emb,
+        qtdMer,
+        total,
+        uv,
+        skuPadrao,
+        endOrigem,
+        endDestino,
+        endLote,
+        agrupamentoLote,
+        funcionario: funcionarioNome,
+        data,
+        dataHora
+      });
+
+      // Cria a linha de ranking (Usando a UMA ORIGEM como identificador do colaborador)
+      registros.push({
+        pagina: pageNum,
+        atividade,
+        colaborador: umaOrigem, // Chave do ranking
+        qtdOrdens: 1,
+        qtdPecas: qtdMer,
+        qtdLotes: 1,
+        qtdServ: 1,
+        qtdItens: 1,
+        qtdEnd: 1,
+        data,
+        funcionarioOriginal: funcionarioNome,
+        umaOrigem,
+        umaDestino
+      });
+    }
+  }
+
+  /* =======================================================
+     AGRUPAMENTO DOS COLABORADORES (PELA UMA ORIGEM)
+  ======================================================= */
+
+  const mapa = new Map<string, RankingColaborador>();
+
+  for (const registro of registros) {
+    const chave = normalizarChave(registro.colaborador);
+
+    let colab = mapa.get(chave);
+
+    if (!colab) {
+      colab = {
+        nome: registro.colaborador, // UMA ORIGEM
+        turno: obterTurnoColaborador(registro.funcionarioOriginal || ""),
+        qtdOrdens: 0,
+        qtdPecas: 0,
+        qtdLotes: 0,
+        qtdServ: 0,
+        qtdItens: 0,
+        qtdEnd: 0,
+        registros: 0,
+        atividades: [],
+        datas: [],
+        percentual: 0,
+        posicao: 0,
+        registrosDetalhados: [],
+      };
+      mapa.set(chave, colab);
+    }
+
+    colab.qtdOrdens += registro.qtdOrdens;
+    colab.qtdPecas += registro.qtdPecas;
+    colab.qtdLotes += registro.qtdLotes;
+    colab.qtdServ += registro.qtdServ;
+    colab.qtdItens += registro.qtdItens;
+    colab.qtdEnd += registro.qtdEnd;
+    colab.registros++;
+
+    if (!colab.atividades.includes(registro.atividade)) {
+      colab.atividades.push(registro.atividade);
+    }
+
+    if (!colab.datas.includes(registro.data)) {
+      colab.datas.push(registro.data);
+    }
+
+    colab.registrosDetalhados.push(registro);
+  }
+
+  const colaboradores = Array.from(mapa.values());
+
+  // Ordenação decrescente por produtividade (Qtd. Ordens)
+  colaboradores.sort((a, b) => {
+    if (b.qtdOrdens !== a.qtdOrdens) {
+      return b.qtdOrdens - a.qtdOrdens;
+    }
+    return a.nome.localeCompare(b.nome, "pt-BR", { sensitivity: "base" });
+  });
+
+  const totalOrdens = colaboradores.reduce((soma, c) => soma + c.qtdOrdens, 0);
+
+  colaboradores.forEach((colab, index) => {
+    colab.posicao = index + 1;
+    colab.percentual = totalOrdens > 0 ? (colab.qtdOrdens / totalOrdens) * 100 : 0;
+
+    // Constrói o dicionário de atividades otimizado
+    const actMap: Record<string, {
+      qtdOrdens: number;
+      qtdPecas: number;
+      qtdLotes: number;
+      qtdServ: number;
+      qtdItens: number;
+      qtdEnd: number;
+      registros: number;
+    }> = {};
+
+    for (const r of colab.registrosDetalhados) {
+      const normAct = normalizarAtividade(r.atividade);
+      if (!actMap[normAct]) {
+        actMap[normAct] = {
+          qtdOrdens: 0,
+          qtdPecas: 0,
+          qtdLotes: 0,
+          qtdServ: 0,
+          qtdItens: 0,
+          qtdEnd: 0,
+          registros: 0
+        };
+      }
+      actMap[normAct].qtdOrdens += r.qtdOrdens;
+      actMap[normAct].qtdPecas += r.qtdPecas;
+      actMap[normAct].qtdLotes += r.qtdLotes;
+      actMap[normAct].qtdServ += r.qtdServ;
+      actMap[normAct].qtdItens += r.qtdItens;
+      actMap[normAct].qtdEnd += r.qtdEnd;
+      actMap[normAct].registros++;
+    }
+    colab.activitiesMetrics = actMap;
+
+    // Se o dataset de registros for muito grande (>5000), descarta os detalhes
+    // para economizar tráfego com LocalStorage e Realtime Database.
+    if (registros.length > 5000) {
+      colab.registrosDetalhados = [];
+    }
+  });
+
+  const atividades = Array.from(
+    new Set(registros.map((r) => r.atividade))
+  );
+
+  // Extrai período e intervalo de datas
+  const arrayDatas = Array.from(new Set(registros.map(r => r.data)))
+    .filter(d => parseDataBRTimestamp(d) > 0)
+    .sort((a, b) => parseDataBRTimestamp(a) - parseDataBRTimestamp(b));
+
+  const dataInicio = arrayDatas[0] || "02/01/2026";
+  const dataFim = arrayDatas[arrayDatas.length - 1] || "20/09/2026";
+  const frasePeriodo = `início do período ${dataInicio} ao fim do período ${dataFim}`;
+
+  return {
+    totalPaginas: pdf.numPages,
+    linhas: registros,
+    colaboradores,
+    atividades,
+    totalRegistros: registros.length,
+    totalColaboradores: colaboradores.length,
+    dataInicio,
+    dataFim,
+    frasePeriodo,
+    todasDatas: arrayDatas,
+    rawRows
   };
 }

@@ -77,7 +77,8 @@ export const LayerRankingTable: React.FC<LayerRankingTableProps> = ({
       'GOODS ISSUE',
       'MOV/EXP',
       'CONF RECEBIMENTO',
-      'MOVIMENTACAO'
+      'MOVIMENTACAO',
+      'INVENTARIO'
     ];
 
     const foundSet = new Set<string>();
@@ -94,6 +95,11 @@ export const LayerRankingTable: React.FC<LayerRankingTableProps> = ({
       if (op.activitiesCount) {
         Object.keys(op.activitiesCount).forEach((act) => {
           foundSet.add(act.replace(/_/g, '/').trim());
+        });
+      }
+      if (op.activitiesMetrics) {
+        Object.keys(op.activitiesMetrics).forEach((act) => {
+          foundSet.add(act.toUpperCase().replace(/_/g, '/').trim());
         });
       }
     });
@@ -118,6 +124,67 @@ export const LayerRankingTable: React.FC<LayerRankingTableProps> = ({
 
     // 1. Mapeia e recalcula os totais de cada colaborador para a atividade selecionada
     let resultado = operators.map((colab) => {
+      // Se possui o mapeamento de métricas pré-agrupado de altíssima performance (essencial para >99k linhas)
+      if (colab.activitiesMetrics && typeof colab.activitiesMetrics === 'object') {
+        if (!selectedActivity || selectedActivity === 'TODAS AS ATIVIDADES') {
+          return colab;
+        }
+
+        const atvNorm = normalizarAtividade(selectedActivity);
+        let metrics = colab.activitiesMetrics[atvNorm];
+
+        if (!metrics) {
+          const matchingKey = Object.keys(colab.activitiesMetrics).find((key) => {
+            if (key === atvNorm) return true;
+            if (key.includes(atvNorm) || atvNorm.includes(key)) return true;
+            // Abreviações
+            if (atvNorm.includes('CONF_VOLUME') && (key.includes('VOLUME') || key.includes('VOL'))) return true;
+            if (atvNorm.includes('CONF_CARREG') && (key.includes('CARREG') || key.includes('CARGA'))) return true;
+            if (atvNorm.includes('CONF_RECEB') && (key.includes('RECEB') || key.includes('REC'))) return true;
+            if (atvNorm.includes('MOV_EXP') && (key.includes('MOV') && key.includes('EXP'))) return true;
+            if (atvNorm.includes('APANHA') && (key.includes('APANHA') || key.includes('SEPAR') || key.includes('PICK'))) return true;
+            if (atvNorm.includes('GOODS_ISSUE') && (key.includes('GOODS') || key.includes('ISSUE') || key.includes('BAIXA'))) return true;
+            if (atvNorm.includes('MOVIMENTACAO') && key.includes('MOV')) return true;
+            if (atvNorm.includes('INVENTARIO') && key.includes('INV')) return true;
+            return false;
+          });
+          if (matchingKey) {
+            metrics = colab.activitiesMetrics[matchingKey];
+          }
+        }
+
+        if (metrics) {
+          const totalMov = metrics.qtdServ + metrics.qtdPecas + metrics.qtdLotes;
+          return {
+            ...colab,
+            totalProductivity: metrics.qtdOrdens,
+            movements: totalMov > 0 ? totalMov : (metrics.qtdServ || metrics.registros),
+            qtdOrdens: metrics.qtdOrdens,
+            qtdPecas: metrics.qtdPecas,
+            qtdLotes: metrics.qtdLotes,
+            qtdServ: metrics.qtdServ,
+            qtdItens: metrics.qtdItens,
+            qtdEnd: metrics.qtdEnd,
+            registros: metrics.registros,
+            registrosDetalhados: [],
+          };
+        } else {
+          return {
+            ...colab,
+            totalProductivity: 0,
+            movements: 0,
+            qtdOrdens: 0,
+            qtdPecas: 0,
+            qtdLotes: 0,
+            qtdServ: 0,
+            qtdItens: 0,
+            qtdEnd: 0,
+            registros: 0,
+            registrosDetalhados: [],
+          };
+        }
+      }
+
       // Se possui registros detalhados, filtra estritamente por atividade
       if (colab.registrosDetalhados && colab.registrosDetalhados.length > 0) {
         const registrosFiltrados = colab.registrosDetalhados.filter((registro) => {

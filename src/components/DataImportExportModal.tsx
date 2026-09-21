@@ -1,9 +1,10 @@
 import React, { useState, useRef } from 'react';
 import { X, UploadCloud, AlertCircle, FileSpreadsheet, RefreshCw, CheckCircle2, FileText, Loader2, Database } from 'lucide-react';
 import { OperatorSummary, PeriodPreset } from '../types';
-import { lerRankingProdutividade, RankingPdfResult, parseDataBRTimestamp } from '../utils/rankingPdfParser';
+import { lerRankingProdutividade, lerRankingUMA, RankingPdfResult, parseDataBRTimestamp } from '../utils/rankingPdfParser';
 import { obterTurnoColaborador } from '../utils/turnos';
 import { salvarRankingRealtime, salvarHistoricoImportacao, limparRankingRealtime } from '../services/firebase';
+import * as XLSX from 'xlsx';
 
 interface DataImportExportModalProps {
   isOpen: boolean;
@@ -19,12 +20,14 @@ export const DataImportExportModal: React.FC<DataImportExportModalProps> = ({
   onClose,
   onImportCustomData
 }) => {
+  const [activeTab, setActiveTab] = useState<'SAGA' | 'UMA'>('SAGA');
   const [pasteText, setPasteText] = useState('');
   const [importStatus, setImportStatus] = useState<string | null>(null);
   const [isLoadingPdf, setIsLoadingPdf] = useState(false);
   const [pdfResult, setPdfResult] = useState<RankingPdfResult | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const fileInputUmaRef = useRef<HTMLInputElement>(null);
 
   if (!isOpen) return null;
 
@@ -149,11 +152,28 @@ export const DataImportExportModal: React.FC<DataImportExportModalProps> = ({
   const handleFile = async (file: File) => {
     if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
       setIsLoadingPdf(true);
-      setImportStatus(`Lendo todas as páginas do PDF "${file.name}" com PDF.js...`);
+      setImportStatus(`Lendo todas as páginas do PDF "${file.name}"...`);
       try {
-        const result = await lerRankingProdutividade(file);
-        setPdfResult(result);
-        processRankingResult(result, file.name);
+        if (activeTab === 'UMA') {
+          setImportStatus(`Analisando relatório de U.M.A. e convertendo em Excel...`);
+          const result = await lerRankingUMA(file);
+
+          // Gera e faz download automático do Excel
+          setImportStatus(`Gerando planilha Excel convertida...`);
+          const ws = XLSX.utils.json_to_sheet(result.rawRows);
+          const wb = XLSX.utils.book_new();
+          XLSX.utils.book_append_sheet(wb, ws, "U.M.A. Convertida");
+          const excelName = file.name.replace(/\.pdf$/i, '') + ".xlsx";
+          XLSX.writeFile(wb, excelName);
+
+          setPdfResult(result);
+          await processRankingResult(result, file.name);
+          setImportStatus(`Sucesso! PDF convertido em Excel e ranking de U.M.A. Origem importado.`);
+        } else {
+          const result = await lerRankingProdutividade(file);
+          setPdfResult(result);
+          await processRankingResult(result, file.name);
+        }
       } catch (err: any) {
         console.error(err);
         setImportStatus(`Erro ao processar PDF: ${err.message || 'Falha na leitura'}`);
@@ -306,11 +326,39 @@ export const DataImportExportModal: React.FC<DataImportExportModalProps> = ({
         </div>
 
         {/* Tab Navigation */}
-        <div className="px-8 pt-4 flex gap-2 border-b border-slate-100">
-          <div className="pb-3 px-4 text-xs font-bold border-b-2 border-amber-500 text-amber-600 flex items-center gap-2">
+        <div className="px-8 pt-4 flex gap-2 border-b border-slate-100 bg-slate-50/70">
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab('SAGA');
+              setPdfResult(null);
+              setImportStatus(null);
+            }}
+            className={`pb-3 px-4 text-xs font-bold border-b-2 flex items-center gap-2 cursor-pointer transition-colors ${
+              activeTab === 'SAGA'
+                ? 'border-amber-500 text-amber-600 font-black'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+          >
             <FileText className="w-4 h-4" />
-            Importe do SAGA em PDF
-          </div>
+            Importar Produtividade SAGA
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab('UMA');
+              setPdfResult(null);
+              setImportStatus(null);
+            }}
+            className={`pb-3 px-4 text-xs font-bold border-b-2 flex items-center gap-2 cursor-pointer transition-colors ${
+              activeTab === 'UMA'
+                ? 'border-amber-500 text-amber-600 font-black'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <FileSpreadsheet className="w-4 h-4" />
+            Importar U.M.A. (PDF para Excel)
+          </button>
         </div>
 
         {/* Body */}
@@ -338,23 +386,31 @@ export const DataImportExportModal: React.FC<DataImportExportModalProps> = ({
                 <div className="flex flex-col items-center gap-2 py-4">
                   <Loader2 className="w-10 h-10 text-amber-500 animate-spin" />
                   <p className="text-sm font-black text-slate-800">
-                    Processando todas as páginas do PDF com PDF.js...
+                    {activeTab === 'UMA'
+                      ? 'Processando relatório de U.M.A. e gerando Excel...'
+                      : 'Processando todas as páginas do PDF com PDF.js...'}
                   </p>
                   <p className="text-xs text-slate-500">
-                    Consolidando registros de datas e somando produtividades reais.
+                    {activeTab === 'UMA'
+                      ? 'Extraindo dados tabulares de U.M.A. Origem e gerando planilha convertida...'
+                      : 'Consolidando registros de datas e somando produtividades reais.'}
                   </p>
                 </div>
               ) : (
                 <>
                   <UploadCloud className="w-12 h-12 text-amber-500 mb-2" />
                   <p className="text-base font-bold text-slate-800">
-                    Selecione ou Arraste o Relatório PDF Oficial do SAGA
+                    {activeTab === 'UMA'
+                      ? 'Selecione ou Arraste o Relatório de U.M.A. em PDF'
+                      : 'Selecione ou Arraste o Relatório PDF Oficial do SAGA'}
                   </p>
                   <p className="text-xs text-slate-500 mt-1 max-w-md">
-                    O parser lê automaticamente todas as páginas do PDF, somando a coluna "qtd. Ordens", identificando os turnos (A, B, C, ADM, RANDS) e <strong>substituindo integralmente todos os dados anteriores</strong>.
+                    {activeTab === 'UMA'
+                      ? 'O parser lê o PDF de U.M.A., separa o ranking pela coluna "UMA Origem", gera e baixa automaticamente o Excel correspondente, e substitui integralmente todas as informações do dashboard.'
+                      : 'O parser lê automaticamente todas as páginas do PDF, somando a coluna "qtd. Ordens", identificando os turnos (A, B, C, ADM, RANDS) e substituindo integralmente todos os dados anteriores.'}
                   </p>
                   <span className="mt-3 px-3 py-1 bg-amber-100 text-amber-900 rounded-full text-[11px] font-bold">
-                    Substituição Total • Realtime Database Sincronizado
+                    {activeTab === 'UMA' ? 'Conversão Excel Automática • Substituição Total' : 'Substituição Total • Realtime Database Sincronizado'}
                   </span>
                 </>
               )}

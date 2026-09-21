@@ -35,6 +35,15 @@ export interface OperatorSummary {
   qtdEnd?: number;
   registros?: number;
   registrosDetalhados?: RankingRow[];
+  activitiesMetrics?: Record<string, {
+    qtdOrdens: number;
+    qtdPecas: number;
+    qtdLotes: number;
+    qtdServ: number;
+    qtdItens: number;
+    qtdEnd: number;
+    registros: number;
+  }>;
 }
 
 export interface DashboardKPIs {
