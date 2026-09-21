@@ -1,12 +1,15 @@
 import React, { useState, useMemo } from 'react';
-import { Search, Filter, ArrowUp, ArrowDown, ChevronDown, Check, Trophy, Sparkles, Activity, ShieldCheck, X, RotateCcw } from 'lucide-react';
+import { Search, Filter, ArrowUp, ArrowDown, ChevronDown, Check, Trophy, Sparkles, Activity, ShieldCheck, X, RotateCcw, Clock } from 'lucide-react';
 import { OperatorSummary } from '../types';
 import { normalizarAtividade, RankingColaborador, RankingRow } from '../utils/rankingPdfParser';
+import { TURNOS_DISPONIVEIS, obterTurnoColaborador, obterEstiloVisualTurno } from '../utils/turnos';
 
 interface LayerRankingTableProps {
   operators: OperatorSummary[];
   selectedActivity: string;
   onSelectActivity: (activity: string) => void;
+  selectedTurno?: string;
+  onSelectTurno?: (turno: string) => void;
   onSelectOperator: (name: string) => void;
   selectedOperator: string | null;
   onOpenShowcase?: (operatorName?: string) => void;
@@ -16,13 +19,49 @@ export const LayerRankingTable: React.FC<LayerRankingTableProps> = ({
   operators,
   selectedActivity,
   onSelectActivity,
+  selectedTurno,
+  onSelectTurno,
   onSelectOperator,
   selectedOperator,
   onOpenShowcase
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [localTurno, setLocalTurno] = useState('TODOS');
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   const [sortBy, setSortBy] = useState<'produtividade' | 'movimentacoes' | 'nome'>('produtividade');
+
+  const activeTurno = selectedTurno !== undefined ? selectedTurno : localTurno;
+  const handleTurnoChange = (t: string) => {
+    if (onSelectTurno) {
+      onSelectTurno(t);
+    } else {
+      setLocalTurno(t);
+    }
+  };
+
+  // Contagem de colaboradores por turno
+  const turnoCounts = useMemo(() => {
+    const counts: Record<string, number> = {
+      TODOS: operators.length,
+      A: 0,
+      B: 0,
+      C: 0,
+      ADM: 0,
+      RANDS: 0,
+      OUTROS: 0,
+    };
+
+    operators.forEach((op) => {
+      const t = (op.turno || obterTurnoColaborador(op.name)).toUpperCase();
+      if (counts[t] !== undefined) {
+        counts[t]++;
+      } else {
+        counts.OUTROS++;
+      }
+    });
+
+    return counts;
+  }, [operators]);
 
   // Extrai dinamicamente todas as atividades reais encontradas no conjunto de dados
   const availableActivities = useMemo(() => {
@@ -142,6 +181,14 @@ export const LayerRankingTable: React.FC<LayerRankingTableProps> = ({
       resultado = resultado.filter((c) => (c.registros ?? 0) > 0 || c.totalProductivity > 0);
     }
 
+    // 2.5. Filtro por Turno (A, B, C, ADM, RANDS)
+    if (activeTurno && activeTurno !== 'TODOS' && activeTurno !== 'TODOS OS TURNOS') {
+      resultado = resultado.filter((c) => {
+        const t = c.turno || obterTurnoColaborador(c.name);
+        return t.toUpperCase() === activeTurno.toUpperCase();
+      });
+    }
+
     // 3. Aplica busca por nome (se houver termo digitado)
     if (searchNorm) {
       resultado = resultado.filter((c) => normalizarAtividade(c.name).includes(searchNorm));
@@ -174,7 +221,7 @@ export const LayerRankingTable: React.FC<LayerRankingTableProps> = ({
       rank: index + 1,
       participation: totalProdFiltrado > 0 ? +((colab.totalProductivity / totalProdFiltrado) * 100).toFixed(2) : 0,
     }));
-  }, [operators, selectedActivity, searchTerm, sortBy]);
+  }, [operators, selectedActivity, activeTurno, searchTerm, sortBy]);
 
   // Maior valor para cálculo visual das barras de progresso
   const maxProductivity = useMemo(() => {
@@ -281,6 +328,20 @@ export const LayerRankingTable: React.FC<LayerRankingTableProps> = ({
               </div>
             )}
 
+            {/* Badge de Turno Ativo com Botão X para Limpar */}
+            {activeTurno !== 'TODOS' && (
+              <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900 text-amber-300 font-extrabold text-xs shadow-md uppercase tracking-wide border border-slate-700">
+                <span>Turno: {activeTurno}</span>
+                <button
+                  onClick={() => handleTurnoChange('TODOS')}
+                  title="Remover filtro de turno"
+                  className="w-4 h-4 rounded-full bg-white/20 hover:bg-white/40 flex items-center justify-center transition-colors cursor-pointer ml-1 text-white"
+                >
+                  <X className="w-2.5 h-2.5" />
+                </button>
+              </div>
+            )}
+
             {searchTerm.trim() !== '' && (
               <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-500 text-white font-bold text-xs shadow-sm uppercase">
                 <span>Busca: "{searchTerm}"</span>
@@ -380,6 +441,42 @@ export const LayerRankingTable: React.FC<LayerRankingTableProps> = ({
                   })}
                 </div>
 
+                {/* Filtro por Turno no Dropdown */}
+                <div className="border-t border-slate-100 my-2 pt-2">
+                  <div className="px-2 py-1 text-[10.5px] font-black uppercase tracking-wider text-slate-400 flex items-center gap-1">
+                    <Clock className="w-3 h-3 text-amber-500" />
+                    Filtrar por Turno
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-1.5 mt-1">
+                    {TURNOS_DISPONIVEIS.map((t) => {
+                      const isSel = activeTurno.toUpperCase() === t.id.toUpperCase();
+                      const count = turnoCounts[t.id] ?? 0;
+                      return (
+                        <button
+                          key={t.id}
+                          onClick={() => {
+                            handleTurnoChange(t.id);
+                            setShowFilterDropdown(false);
+                          }}
+                          className={`px-2 py-1.5 rounded-xl text-[11px] font-black text-center transition-all cursor-pointer flex items-center justify-between ${
+                            isSel
+                              ? 'bg-slate-900 text-white shadow-md'
+                              : 'bg-slate-100 text-slate-700 hover:bg-slate-200/80'
+                          }`}
+                        >
+                          <span className="truncate">{t.id}</span>
+                          <span className={`text-[9px] px-1 py-0.2 rounded-md font-bold ${
+                            isSel ? 'bg-amber-400 text-slate-950' : 'bg-slate-200 text-slate-600'
+                          }`}>
+                            {count}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
                 <div className="border-t border-slate-100 my-2 pt-2.5">
                   <div className="px-2 py-1 text-[10.5px] font-black uppercase tracking-wider text-slate-400">
                     Ordenar Por
@@ -437,13 +534,60 @@ export const LayerRankingTable: React.FC<LayerRankingTableProps> = ({
         </div>
       </div>
 
+      {/* BARRA DE FILTRO DE TURNOS RÁPIDA (TODOS, A, B, C, ADM, RANDS) */}
+      <div className="flex items-center justify-between py-1.5 px-3 bg-slate-100/90 rounded-2xl border border-slate-200/80 my-1 shadow-2xs">
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] font-black text-slate-500 uppercase tracking-wider flex items-center gap-1">
+            <Clock className="w-3.5 h-3.5 text-amber-500" />
+            Turno:
+          </span>
+          <div className="flex items-center gap-1 bg-white p-0.5 rounded-xl border border-slate-200/80">
+            {TURNOS_DISPONIVEIS.map((t) => {
+              const isSelected = activeTurno.toUpperCase() === t.id.toUpperCase();
+              const count = turnoCounts[t.id] ?? 0;
+              return (
+                <button
+                  key={t.id}
+                  onClick={() => handleTurnoChange(t.id)}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                    isSelected
+                      ? 'bg-slate-900 text-white shadow-sm ring-1 ring-slate-700'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                  }`}
+                >
+                  <span>{t.label}</span>
+                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-extrabold ${
+                    isSelected ? 'bg-amber-400 text-slate-950' : 'bg-slate-100 text-slate-600'
+                  }`}>
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Resumo do Turno Ativo */}
+        <div className="flex items-center gap-2 text-xs font-bold text-slate-500 pr-1">
+          <span>Mostrando: <strong className="text-slate-900">{filteredOperators.length}</strong> de <strong className="text-slate-900">{operators.length}</strong> colaboradores</span>
+          {activeTurno !== 'TODOS' && (
+            <button
+              onClick={() => handleTurnoChange('TODOS')}
+              className="text-[11px] font-black text-amber-600 hover:text-amber-700 underline cursor-pointer ml-1"
+            >
+              Ver Todos os Turnos
+            </button>
+          )}
+        </div>
+      </div>
+
       {/* 3D Ultra Column Headers */}
-      <div className="grid grid-cols-[75px_230px_1fr_170px_130px_130px_110px] items-center px-4 py-2.5 text-[11px] font-black uppercase tracking-wider text-slate-400 border-b border-slate-200/50 my-1">
+      <div className="grid grid-cols-[70px_250px_1fr_170px_130px_130px_110px] items-center px-4 py-2.5 text-[11px] font-black uppercase tracking-wider text-slate-400 border-b border-slate-200/50 my-1">
         <div className="text-center flex items-center justify-center gap-1">
           <ShieldCheck className="w-3.5 h-3.5 text-amber-500" />
           POSIÇÃO
         </div>
-        <div>COLABORADOR</div>
+        <div>COLABORADOR & TURNO</div>
         <div className="px-2">DESEMPENHO RELATIVO</div>
         <div className="text-right">PRODUTIVIDADE (QTD. ORDENS)</div>
         <div className="text-center">MOVIMENTAÇÕES</div>
@@ -459,11 +603,12 @@ export const LayerRankingTable: React.FC<LayerRankingTableProps> = ({
         {filteredOperators.length === 0 ? (
           <div className="h-44 flex flex-col items-center justify-center text-slate-400">
             <Search className="w-8 h-8 mb-2 opacity-40" />
-            <p className="text-sm font-bold">Nenhum registro encontrado para esta atividade.</p>
+            <p className="text-sm font-bold">Nenhum registro encontrado para este filtro de atividade ou turno.</p>
             {isFilterActive && (
               <button
                 onClick={() => {
                   onSelectActivity('TODAS AS ATIVIDADES');
+                  handleTurnoChange('TODOS');
                   setSearchTerm('');
                   setSortBy('produtividade');
                 }}
@@ -483,7 +628,7 @@ export const LayerRankingTable: React.FC<LayerRankingTableProps> = ({
               <div
                 key={op.name}
                 onClick={() => onSelectOperator(op.name)}
-                className={`ranking-row-3d grid grid-cols-[75px_230px_1fr_170px_130px_130px_110px] items-center px-4 py-2 cursor-pointer rounded-2xl border transition-all ${
+                className={`ranking-row-3d grid grid-cols-[70px_250px_1fr_170px_130px_130px_110px] items-center px-4 py-2 cursor-pointer rounded-2xl border transition-all ${
                   isSelected
                     ? 'bg-gradient-to-r from-amber-100/90 via-amber-50/95 to-amber-100/90 border-amber-400 ring-2 ring-amber-400/60 shadow-lg'
                     : 'border-transparent hover:border-amber-200/60'
@@ -510,11 +655,20 @@ export const LayerRankingTable: React.FC<LayerRankingTableProps> = ({
                   )}
                 </div>
 
-                {/* 2. COLABORADOR */}
-                <div className="flex items-center gap-2 pr-2">
-                  <span className="text-[14px] font-black text-slate-900 tracking-tight uppercase truncate font-heading">
+                {/* 2. COLABORADOR COM BADGE DE TURNO */}
+                <div className="flex items-center gap-2 pr-2 overflow-hidden">
+                  <span className="text-[13.5px] font-black text-slate-900 tracking-tight uppercase truncate font-heading">
                     {op.name}
                   </span>
+                  {(() => {
+                    const turno = op.turno || obterTurnoColaborador(op.name);
+                    const turnoStyle = obterEstiloVisualTurno(turno);
+                    return (
+                      <span className={`px-2 py-0.5 rounded-md text-[9.5px] font-black uppercase tracking-wider shrink-0 border shadow-2xs ${turnoStyle.badgeBg} ${turnoStyle.badgeText} ${turnoStyle.badgeBorder}`}>
+                        {turnoStyle.tag}
+                      </span>
+                    );
+                  })()}
                 </div>
 
                 {/* 3. BARRA DE PRODUTIVIDADE 3D COM GLOW E NEON */}

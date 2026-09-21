@@ -10,11 +10,13 @@ import { EMPTY_OPERATORS, EMPTY_KPIS } from './data/productivityData';
 import { OperatorSummary, DashboardKPIs, PeriodPreset } from './types';
 import { ouvirRankingRealtime, carregarCacheLocal } from './services/firebase';
 import { normalizarAtividade } from './utils/rankingPdfParser';
+import { obterTurnoColaborador } from './utils/turnos';
 
 export default function App() {
   const [periodPreset, setPeriodPreset] = useState<PeriodPreset>('reference');
   const [viewMode, setViewMode] = useState<'showcase' | 'list'>('showcase');
   const [selectedActivity, setSelectedActivity] = useState<string>('TODAS AS ATIVIDADES');
+  const [selectedTurno, setSelectedTurno] = useState<string>('TODOS');
   const [selectedOperator, setSelectedOperator] = useState<string | null>(null);
   const [isDataModalOpen, setIsDataModalOpen] = useState(false);
 
@@ -67,21 +69,98 @@ export default function App() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Compute active dataset based on preset
+  // Compute active dataset based on preset and assign turno
   const rawActiveOperators = useMemo(() => {
-    if (customOperators && customOperators.length > 0) return customOperators;
-    return EMPTY_OPERATORS;
+    const list = customOperators && customOperators.length > 0 ? customOperators : EMPTY_OPERATORS;
+    return list.map((op) => ({
+      ...op,
+      turno: op.turno || obterTurnoColaborador(op.name),
+    }));
   }, [customOperators]);
 
-  // Compute active KPIs
-  const currentKPIs = useMemo<DashboardKPIs>(() => {
-    if (customOperators && customOperators.length > 0) {
-      const totalProd = customOperators.reduce((acc, curr) => acc + curr.totalProductivity, 0);
-      const totalMov = customOperators.reduce((acc, curr) => acc + curr.movements, 0);
+  // Helper to filter and recalculate top operators by Shift (Turno) and Activity (Atividade)
+  const filteredActiveOperators = useMemo(() => {
+    // 1. Filtro por Turno (A, B, C, ADM, RANDS)
+    let list = rawActiveOperators;
+    if (selectedTurno && selectedTurno !== 'TODOS' && selectedTurno !== 'TODOS OS TURNOS') {
+      list = list.filter((op) => {
+        const t = op.turno || obterTurnoColaborador(op.name);
+        return t.toUpperCase() === selectedTurno.toUpperCase();
+      });
+    }
 
-      // Find predominant activity across all custom operators
+    // 2. Filtro por Atividade
+    if (selectedActivity && selectedActivity !== 'TODAS AS ATIVIDADES') {
+      const targetNorm = normalizarAtividade(selectedActivity);
+
+      list = list
+        .map((colab) => {
+          if (colab.registrosDetalhados && colab.registrosDetalhados.length > 0) {
+            const matching = colab.registrosDetalhados.filter((r) => {
+              const regNorm = normalizarAtividade(r.atividade);
+              if (regNorm === targetNorm) return true;
+              if (regNorm.includes(targetNorm) || targetNorm.includes(regNorm)) return true;
+              if (targetNorm.includes('CONF VOLUME') && (regNorm.includes('VOLUME') || regNorm.includes('VOL'))) return true;
+              if (targetNorm.includes('CONF CARREG') && (regNorm.includes('CARREG') || regNorm.includes('CARGA'))) return true;
+              if (targetNorm.includes('CONF RECEB') && (regNorm.includes('RECEB') || regNorm.includes('REC'))) return true;
+              if (targetNorm.includes('MOV EXP') && (regNorm.includes('MOV') && regNorm.includes('EXP'))) return true;
+              if (targetNorm.includes('APANHA') && (regNorm.includes('APANHA') || regNorm.includes('SEPAR') || regNorm.includes('PICK'))) return true;
+              if (targetNorm.includes('GOODS ISSUE') && (regNorm.includes('GOODS') || regNorm.includes('ISSUE') || regNorm.includes('BAIXA'))) return true;
+              if (targetNorm.includes('MOVIMENTACAO') && regNorm.includes('MOV')) return true;
+              return false;
+            });
+
+            const sumOrdens = matching.reduce((t, r) => t + r.qtdOrdens, 0);
+            const sumServ = matching.reduce((t, r) => t + r.qtdServ, 0);
+            const sumPecas = matching.reduce((t, r) => t + r.qtdPecas, 0);
+            const sumLotes = matching.reduce((t, r) => t + r.qtdLotes, 0);
+
+            return {
+              ...colab,
+              totalProductivity: sumOrdens,
+              movements: sumServ + sumPecas + sumLotes || sumServ || matching.length,
+              registros: matching.length,
+            };
+          }
+
+          const actVal = colab.activitiesCount ? (colab.activitiesCount[selectedActivity] || 0) : 0;
+          return {
+            ...colab,
+            totalProductivity: actVal,
+            registros: actVal > 0 ? 1 : 0,
+          };
+        })
+        .filter((c) => c.totalProductivity > 0);
+    }
+
+    // Ordenação decrescente por produtividade (Qtd. Ordens)
+    const sorted = [...list].sort((a, b) => {
+      if (b.totalProductivity !== a.totalProductivity) {
+        return b.totalProductivity - a.totalProductivity;
+      }
+      return a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' });
+    });
+
+    const totalSubsetProd = sorted.reduce((sum, c) => sum + c.totalProductivity, 0);
+
+    return sorted.map((colab, idx) => ({
+      ...colab,
+      rank: idx + 1,
+      participation: totalSubsetProd > 0 ? +((colab.totalProductivity / totalSubsetProd) * 100).toFixed(2) : 0,
+    }));
+  }, [rawActiveOperators, selectedTurno, selectedActivity]);
+
+  // Compute active KPIs (dinâmicos conforme o turno ou atividade selecionados)
+  const currentKPIs = useMemo<DashboardKPIs>(() => {
+    const dataset = filteredActiveOperators.length > 0 ? filteredActiveOperators : rawActiveOperators;
+
+    if (dataset && dataset.length > 0) {
+      const totalProd = dataset.reduce((acc, curr) => acc + curr.totalProductivity, 0);
+      const totalMov = dataset.reduce((acc, curr) => acc + curr.movements, 0);
+
+      // Find predominant activity across dataset
       const actMap: Record<string, number> = {};
-      customOperators.forEach(op => {
+      dataset.forEach(op => {
         if (op.activitiesCount) {
           Object.entries(op.activitiesCount).forEach(([act, val]) => {
             actMap[act] = (actMap[act] || 0) + val;
@@ -97,77 +176,29 @@ export default function App() {
         }
       });
 
+      const shiftSuffix = selectedTurno !== 'TODOS' ? ` • Turno ${selectedTurno}` : '';
+
       return {
         totalProductivity: totalProd,
-        totalOperators: customOperators.length,
+        totalOperators: dataset.length,
         totalMovements: totalMov,
-        averagePerOperator: Math.round(totalProd / (customOperators.length || 1)),
+        averagePerOperator: Math.round(totalProd / (dataset.length || 1)),
         topOperator: {
-          name: customOperators[0]?.name || 'N/A',
-          productivity: customOperators[0]?.totalProductivity || 0
+          name: dataset[0]?.name || 'N/A',
+          productivity: dataset[0]?.totalProductivity || 0
         },
         lowestOperator: {
-          name: customOperators[customOperators.length - 1]?.name || 'N/A',
-          productivity: customOperators[customOperators.length - 1]?.totalProductivity || 0
+          name: dataset[dataset.length - 1]?.name || 'N/A',
+          productivity: dataset[dataset.length - 1]?.totalProductivity || 0
         },
         topActivity: `${bestAct} (${maxActCount.toLocaleString('pt-BR')})`,
-        periodLabel: customLabel || "Relatório Importado",
+        periodLabel: (customLabel || "Relatório SAGA") + shiftSuffix,
         siteLabel: "3 COR - BH"
       };
     }
 
     return EMPTY_KPIS;
-  }, [customOperators, customLabel]);
-
-  // Helper to recalculate top operators when an activity is selected based on Qtd. Serv.
-  const filteredActiveOperators = useMemo(() => {
-    if (!selectedActivity || selectedActivity === 'TODAS AS ATIVIDADES') {
-      return rawActiveOperators;
-    }
-    const targetNorm = normalizarAtividade(selectedActivity);
-
-    const list = rawActiveOperators
-      .map((colab) => {
-        if (colab.registrosDetalhados && colab.registrosDetalhados.length > 0) {
-          const matching = colab.registrosDetalhados.filter((r) => {
-            const regNorm = normalizarAtividade(r.atividade);
-            if (regNorm === targetNorm) return true;
-            if (regNorm.includes(targetNorm) || targetNorm.includes(regNorm)) return true;
-            if (targetNorm.includes('CONF VOLUME') && (regNorm.includes('VOLUME') || regNorm.includes('VOL'))) return true;
-            if (targetNorm.includes('CONF CARREG') && (regNorm.includes('CARREG') || regNorm.includes('CARGA'))) return true;
-            if (targetNorm.includes('CONF RECEB') && (regNorm.includes('RECEB') || regNorm.includes('REC'))) return true;
-            if (targetNorm.includes('MOV EXP') && (regNorm.includes('MOV') && regNorm.includes('EXP'))) return true;
-            if (targetNorm.includes('APANHA') && (regNorm.includes('APANHA') || regNorm.includes('SEPAR') || regNorm.includes('PICK'))) return true;
-            if (targetNorm.includes('GOODS ISSUE') && (regNorm.includes('GOODS') || regNorm.includes('ISSUE') || regNorm.includes('BAIXA'))) return true;
-            if (targetNorm.includes('MOVIMENTACAO') && regNorm.includes('MOV')) return true;
-            return false;
-          });
-
-          const sumOrdens = matching.reduce((t, r) => t + r.qtdOrdens, 0);
-          const sumServ = matching.reduce((t, r) => t + r.qtdServ, 0);
-          const sumPecas = matching.reduce((t, r) => t + r.qtdPecas, 0);
-          const sumLotes = matching.reduce((t, r) => t + r.qtdLotes, 0);
-
-          return {
-            ...colab,
-            totalProductivity: sumOrdens,
-            movements: sumServ + sumPecas + sumLotes || sumServ || matching.length,
-            registros: matching.length,
-          };
-        }
-
-        const actVal = colab.activitiesCount ? (colab.activitiesCount[selectedActivity] || 0) : 0;
-        return {
-          ...colab,
-          totalProductivity: actVal,
-          registros: actVal > 0 ? 1 : 0,
-        };
-      })
-      .filter((c) => c.totalProductivity > 0);
-
-    list.sort((a, b) => b.totalProductivity - a.totalProductivity);
-    return list;
-  }, [rawActiveOperators, selectedActivity]);
+  }, [filteredActiveOperators, rawActiveOperators, customLabel, selectedTurno]);
 
   // Active top 3 for the 3D podiums (updates with active filter)
   const top1 = filteredActiveOperators[0];
@@ -246,11 +277,13 @@ export default function App() {
           {viewMode === 'showcase' ? (
             <section className="w-full flex-1 flex items-center justify-center">
               <LayerCinematicShowcase
-                operators={rawActiveOperators}
+                operators={filteredActiveOperators}
                 kpis={currentKPIs}
                 onSwitchToListMode={() => setViewMode('list')}
                 onSelectOperator={setSelectedOperator}
                 initialOperatorName={selectedOperator}
+                selectedTurno={selectedTurno}
+                onSelectTurno={setSelectedTurno}
               />
             </section>
           ) : (
@@ -301,6 +334,8 @@ export default function App() {
                   operators={rawActiveOperators}
                   selectedActivity={selectedActivity}
                   onSelectActivity={setSelectedActivity}
+                  selectedTurno={selectedTurno}
+                  onSelectTurno={setSelectedTurno}
                   onSelectOperator={setSelectedOperator}
                   selectedOperator={selectedOperator}
                   onOpenShowcase={(opName) => {

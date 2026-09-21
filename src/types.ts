@@ -16,6 +16,7 @@ export interface RawProductivityEntry {
 export interface OperatorSummary {
   rank: number;
   name: string;
+  turno?: string; // Turno identificado ('A' | 'B' | 'C' | 'ADM' | 'RANDS')
   totalProductivity: number; // Qtd. Ordens (Produtividade Principal do SAGA)
   movements: number; // Movimentações (Qtd. Serv. + Peças + Lotes)
   participation: number; // % de participação no total

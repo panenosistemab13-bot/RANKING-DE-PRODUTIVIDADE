@@ -2,6 +2,7 @@
 
 import * as pdfjsLib from "pdfjs-dist";
 import pdfWorker from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+import { obterTurnoColaborador } from "./turnos";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
 
@@ -20,6 +21,7 @@ export interface RankingRow {
 
 export interface RankingColaborador {
   nome: string;
+  turno?: string;
   qtdOrdens: number; // PRODUTIVIDADE = Qtd. Ordens
   qtdPecas: number;
   qtdLotes: number;
@@ -73,18 +75,25 @@ export function normalizarAtividade(
 export function filtrarRanking(
   colaboradores: RankingColaborador[],
   atividade: FiltroAtividade,
-  ordenacao: TipoOrdenacao = "produtividade"
+  ordenacao: TipoOrdenacao = "produtividade",
+  turno?: string
 ): RankingColaborador[] {
   /*
-   * Primeiro filtra pela atividade.
+   * Primeiro filtra pela atividade e turno.
    *
    * IMPORTANTE:
-   * Não filtrar pelo nome do colaborador.
-   * O filtro utiliza os registros reais
-   * encontrados no PDF.
+   * O filtro utiliza os registros reais encontrados no PDF.
    */
 
-  let resultado = colaboradores.map((colaborador) => {
+  let baseColaboradores = colaboradores;
+  if (turno && turno !== "TODOS" && turno !== "TODOS OS TURNOS") {
+    baseColaboradores = baseColaboradores.filter((c) => {
+      const colabTurno = c.turno || obterTurnoColaborador(c.nome);
+      return colabTurno.toUpperCase() === turno.toUpperCase();
+    });
+  }
+
+  let resultado = baseColaboradores.map((colaborador) => {
     const registrosFiltrados =
       colaborador.registrosDetalhados.filter(
         (registro) => {
@@ -458,6 +467,7 @@ export async function lerRankingProdutividade(
     if (!colaborador) {
       colaborador = {
         nome: registro.colaborador,
+        turno: obterTurnoColaborador(registro.colaborador),
         qtdOrdens: 0,
         qtdPecas: 0,
         qtdLotes: 0,

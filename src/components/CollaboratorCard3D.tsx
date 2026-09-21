@@ -1,6 +1,7 @@
 import React from 'react';
 import confetti from 'canvas-confetti';
 import { OperatorSummary } from '../types';
+import { obterTurnoColaborador, obterEstiloVisualTurno } from '../utils/turnos';
 
 interface CollaboratorCard3DProps {
   operator: OperatorSummary;
@@ -142,6 +143,8 @@ export const CollaboratorCard3D: React.FC<CollaboratorCard3DProps> = ({
   };
 
   const theme = getTheme();
+  const turno = operator.turno || obterTurnoColaborador(operator.name);
+  const turnoStyle = obterEstiloVisualTurno(turno);
 
   // Dimensions based on size
   const dimensions =
@@ -199,6 +202,14 @@ export const CollaboratorCard3D: React.FC<CollaboratorCard3DProps> = ({
 
         {/* Operator Name & Large Productivity Number */}
         <div className="w-full my-auto flex flex-col items-center">
+          {/* Tag de Turno Identificado */}
+          <div className={`mb-1 px-2.5 py-0.5 rounded-full border shadow-sm flex items-center gap-1 backdrop-blur-md ${turnoStyle.badgeBg} ${turnoStyle.badgeBorder}`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${turnoStyle.dotColor} animate-pulse`} />
+            <span className={`text-[9.5px] font-black tracking-wider uppercase ${turnoStyle.badgeText}`}>
+              {turnoStyle.tag}
+            </span>
+          </div>
+
           <span className={`${dimensions.nameText} font-black tracking-wide uppercase line-clamp-2 max-w-[230px] drop-shadow-xs ${theme.textColor}`}>
             {operator.name}
           </span>

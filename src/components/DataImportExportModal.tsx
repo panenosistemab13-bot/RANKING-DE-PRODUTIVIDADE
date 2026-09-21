@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { X, UploadCloud, AlertCircle, FileSpreadsheet, RefreshCw, CheckCircle2, FileText, Loader2, Database } from 'lucide-react';
 import { OperatorSummary, PeriodPreset } from '../types';
 import { lerRankingProdutividade, RankingPdfResult } from '../utils/rankingPdfParser';
+import { obterTurnoColaborador } from '../utils/turnos';
 import { salvarRankingRealtime, salvarHistoricoImportacao, limparRankingRealtime } from '../services/firebase';
 
 interface DataImportExportModalProps {
@@ -82,6 +83,7 @@ export const DataImportExportModal: React.FC<DataImportExportModalProps> = ({
       return {
         rank: idx + 1,
         name: colab.nome,
+        turno: colab.turno || obterTurnoColaborador(colab.nome),
         totalProductivity: colab.qtdOrdens, // Qtd. Ordens
         movements: totalMov > 0 ? totalMov : (colab.qtdServ || colab.registros || 1),
         participation: +colab.percentual.toFixed(2),

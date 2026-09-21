@@ -9,7 +9,8 @@ import {
   Activity,
   Layers,
   ArrowRight,
-  TableProperties
+  TableProperties,
+  Clock
 } from 'lucide-react';
 import { OperatorSummary, DashboardKPIs } from '../types';
 import { CollaboratorCard3D } from './CollaboratorCard3D';
@@ -20,6 +21,8 @@ interface LayerCinematicShowcaseProps {
   onSwitchToListMode: () => void;
   onSelectOperator?: (name: string) => void;
   initialOperatorName?: string | null;
+  selectedTurno?: string;
+  onSelectTurno?: (turno: string) => void;
 }
 
 export const LayerCinematicShowcase: React.FC<LayerCinematicShowcaseProps> = ({
@@ -27,7 +30,9 @@ export const LayerCinematicShowcase: React.FC<LayerCinematicShowcaseProps> = ({
   kpis,
   onSwitchToListMode,
   onSelectOperator,
-  initialOperatorName
+  initialOperatorName,
+  selectedTurno = 'TODOS',
+  onSelectTurno
 }) => {
   // Current index in operators array (0 to operators.length - 1)
   const [currentIndex, setCurrentIndex] = useState(() => {
@@ -173,9 +178,9 @@ export const LayerCinematicShowcase: React.FC<LayerCinematicShowcaseProps> = ({
       </div>
 
       {/* =========================================================================
-          TOP CINEMA TOOLBAR: MODOS DE VISUALIZAÇÃO
+          TOP CINEMA TOOLBAR: MODOS DE VISUALIZAÇÃO E FILTRO POR TURNO
          ========================================================================= */}
-      <div className="w-full flex items-center justify-center px-6 pt-2 z-20">
+      <div className="w-full flex items-center justify-center gap-3 px-6 pt-2 z-20">
         {/* Seletor de Modo Cinematográfico Centralizado */}
         <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-slate-900/60 backdrop-blur-xl border border-white/20 shadow-xl">
           <button
@@ -202,6 +207,35 @@ export const LayerCinematicShowcase: React.FC<LayerCinematicShowcaseProps> = ({
             <span>CARROSSEL 1 A 1 (TODOS OS {totalOperators})</span>
           </button>
         </div>
+
+        {/* Seletor de Turno na Apresentação 3D */}
+        {onSelectTurno && (
+          <div className="flex items-center gap-1 p-1.5 rounded-2xl bg-slate-900/60 backdrop-blur-xl border border-white/20 shadow-xl">
+            <span className="text-[10.5px] font-black uppercase text-amber-400 tracking-wider flex items-center gap-1 px-2">
+              <Clock className="w-3.5 h-3.5 text-amber-400" />
+              Turno:
+            </span>
+            {['TODOS', 'A', 'B', 'C', 'ADM', 'RANDS'].map((t) => {
+              const isSel = (selectedTurno || 'TODOS').toUpperCase() === t.toUpperCase();
+              return (
+                <button
+                  key={t}
+                  onClick={() => {
+                    onSelectTurno(t);
+                    setCurrentIndex(0);
+                  }}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                    isSel
+                      ? 'bg-amber-500 text-slate-950 font-black shadow-md shadow-amber-500/30'
+                      : 'text-slate-300 hover:text-white hover:bg-white/10'
+                  }`}
+                >
+                  {t}
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* =========================================================================
