@@ -104,7 +104,7 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({
               <span className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
                 Período
               </span>
-              <span className="text-[12.5px] font-bold text-slate-800 tracking-tight">
+              <span className="text-[12px] font-bold text-slate-800 tracking-tight whitespace-nowrap">
                 {periodLabel}
               </span>
             </div>

@@ -24,6 +24,9 @@ export interface OperatorSummary {
   sparkline: number[];  // Mini gráfico de evolução
   topActivity: string;
   activitiesCount: Record<string, number>;
+  datas?: string[];
+  dataInicio?: string;
+  dataFim?: string;
   qtdOrdens?: number;
   qtdPecas?: number;
   qtdLotes?: number;

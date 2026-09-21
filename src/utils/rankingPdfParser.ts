@@ -47,6 +47,10 @@ export interface RankingPdfResult {
   atividades: string[];
   totalRegistros: number;
   totalColaboradores: number;
+  dataInicio?: string;
+  dataFim?: string;
+  frasePeriodo?: string;
+  todasDatas?: string[];
 }
 
 export type FiltroAtividade = string;
@@ -231,6 +235,80 @@ function numero(valor: string): number {
         .replace(",", ".")
     ) || 0
   );
+}
+
+export function parseDataBRTimestamp(str: string): number {
+  if (!str) return 0;
+  const match = str.trim().match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (!match) return 0;
+  const dia = parseInt(match[1], 10);
+  const mes = parseInt(match[2], 10) - 1;
+  const ano = parseInt(match[3], 10);
+  if (isNaN(dia) || isNaN(mes) || isNaN(ano)) return 0;
+  return new Date(ano, mes, dia).getTime();
+}
+
+export function extrairDatasDeTextoOuLinhas(
+  paginasLinhas: string[][],
+  registros: RankingRow[]
+): {
+  dataInicio: string;
+  dataFim: string;
+  frasePeriodo: string;
+  todasDatas: string[];
+} {
+  const datasEncontradas = new Set<string>();
+
+  // 1. Coleta datas das linhas de registro estruturadas
+  for (const reg of registros) {
+    if (reg.data && /^\d{2}\/\d{2}\/\d{4}$/.test(reg.data.trim())) {
+      datasEncontradas.add(reg.data.trim());
+    }
+  }
+
+  // 2. Coleta datas de cabeçalhos e textos de todas as páginas do PDF
+  const regexData = /\b(\d{2}\/\d{2}\/\d{4})\b/g;
+  for (const linhas of paginasLinhas) {
+    for (const linha of linhas) {
+      if (/impresso\s+em/i.test(linha)) continue;
+
+      let match: RegExpExecArray | null;
+      while ((match = regexData.exec(linha)) !== null) {
+        const d = match[1];
+        const parts = d.split('/');
+        const dia = parseInt(parts[0], 10);
+        const mes = parseInt(parts[1], 10);
+        const ano = parseInt(parts[2], 10);
+        if (dia >= 1 && dia <= 31 && mes >= 1 && mes <= 12 && ano >= 2000 && ano <= 2099) {
+          datasEncontradas.add(d);
+        }
+      }
+    }
+  }
+
+  const arrayDatas = Array.from(datasEncontradas).filter((d) => parseDataBRTimestamp(d) > 0);
+
+  if (arrayDatas.length === 0) {
+    return {
+      dataInicio: "02/01/2026",
+      dataFim: "20/09/2026",
+      frasePeriodo: "início do período 02/01/2026 ao fim do período 20/09/2026",
+      todasDatas: ["02/01/2026", "20/09/2026"]
+    };
+  }
+
+  arrayDatas.sort((a, b) => parseDataBRTimestamp(a) - parseDataBRTimestamp(b));
+
+  const dataInicio = arrayDatas[0];
+  const dataFim = arrayDatas[arrayDatas.length - 1];
+  const frasePeriodo = `início do período ${dataInicio} ao fim do período ${dataFim}`;
+
+  return {
+    dataInicio,
+    dataFim,
+    frasePeriodo,
+    todasDatas: arrayDatas
+  };
 }
 
 function ehNumero(valor: string): boolean {
@@ -533,6 +611,8 @@ export async function lerRankingProdutividade(
     new Set(registros.map((registro) => registro.atividade))
   );
 
+  const intervaloDatas = extrairDatasDeTextoOuLinhas(paginas, registros);
+
   return {
     totalPaginas: pdf.numPages,
     linhas: registros,
@@ -540,5 +620,9 @@ export async function lerRankingProdutividade(
     atividades,
     totalRegistros: registros.length,
     totalColaboradores: colaboradores.length,
+    dataInicio: intervaloDatas.dataInicio,
+    dataFim: intervaloDatas.dataFim,
+    frasePeriodo: intervaloDatas.frasePeriodo,
+    todasDatas: intervaloDatas.todasDatas,
   };
 }

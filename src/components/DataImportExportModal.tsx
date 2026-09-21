@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { X, UploadCloud, AlertCircle, FileSpreadsheet, RefreshCw, CheckCircle2, FileText, Loader2, Database } from 'lucide-react';
 import { OperatorSummary, PeriodPreset } from '../types';
-import { lerRankingProdutividade, RankingPdfResult } from '../utils/rankingPdfParser';
+import { lerRankingProdutividade, RankingPdfResult, parseDataBRTimestamp } from '../utils/rankingPdfParser';
 import { obterTurnoColaborador } from '../utils/turnos';
 import { salvarRankingRealtime, salvarHistoricoImportacao, limparRankingRealtime } from '../services/firebase';
 
@@ -91,6 +91,9 @@ export const DataImportExportModal: React.FC<DataImportExportModalProps> = ({
         sparkline,
         topActivity: topAct,
         activitiesCount: Object.keys(activitiesMap).length > 0 ? activitiesMap : { [topAct]: colab.qtdOrdens },
+        datas: colab.datas,
+        dataInicio: result.dataInicio,
+        dataFim: result.dataFim,
         qtdOrdens: colab.qtdOrdens,
         qtdPecas: colab.qtdPecas,
         qtdLotes: colab.qtdLotes,
@@ -108,15 +111,23 @@ export const DataImportExportModal: React.FC<DataImportExportModalProps> = ({
     console.log("REGISTROS:", result.totalRegistros);
     console.log("COLABORADORES:", result.totalColaboradores);
     console.log("ATIVIDADES:", result.atividades);
+    console.log("DATA INÍCIO:", result.dataInicio);
+    console.log("DATA FIM:", result.dataFim);
+    console.log("PERÍODO:", result.frasePeriodo);
     console.table(result.colaboradores);
     console.log("================================");
 
-    const label = `PDF: ${fileName.replace(/\.pdf$/i, '')} (${result.totalColaboradores} Colab.)`;
+    const dataInicio = result.dataInicio;
+    const dataFim = result.dataFim;
+    const label = (dataInicio && dataFim)
+      ? `início do período ${dataInicio} ao fim do período ${dataFim}`
+      : (result.frasePeriodo || 'início do período 02/01/2026 ao fim do período 20/09/2026');
+
     onImportCustomData(parsedOperators, label);
 
     // Save directly to Firebase Realtime Database
     try {
-      await salvarRankingRealtime(parsedOperators, label);
+      await salvarRankingRealtime(parsedOperators, label, dataInicio, dataFim);
       await salvarHistoricoImportacao(
         fileName,
         result.totalPaginas,
@@ -239,11 +250,25 @@ export const DataImportExportModal: React.FC<DataImportExportModalProps> = ({
         op.participation = +((op.totalProductivity / totalProd) * 100).toFixed(2);
       });
 
-      const label = `Relatório (${parsed.length} Colaboradores)`;
+      // Extrai datas do texto se existirem
+      const datasEncontradas = Array.from(new Set(pasteText.match(/\b\d{2}\/\d{2}\/\d{4}\b/g) || []))
+        .filter(d => parseDataBRTimestamp(d) > 0)
+        .sort((a, b) => parseDataBRTimestamp(a) - parseDataBRTimestamp(b));
+
+      const dInicio = datasEncontradas[0] || "02/01/2026";
+      const dFim = datasEncontradas[datasEncontradas.length - 1] || "20/09/2026";
+      const label = `início do período ${dInicio} ao fim do período ${dFim}`;
+
+      parsed.forEach(op => {
+        op.datas = datasEncontradas;
+        op.dataInicio = dInicio;
+        op.dataFim = dFim;
+      });
+
       onImportCustomData(parsed, label);
 
       // Save to Firebase Realtime Database
-      salvarRankingRealtime(parsed, label).catch(e => console.warn("Firebase save error:", e));
+      salvarRankingRealtime(parsed, label, dInicio, dFim).catch(e => console.warn("Firebase save error:", e));
 
       setImportStatus(`Sucesso! ${parsed.length} colaboradores importados e sincronizados no Firebase.`);
       setTimeout(() => {
@@ -284,7 +309,7 @@ export const DataImportExportModal: React.FC<DataImportExportModalProps> = ({
         <div className="px-8 pt-4 flex gap-2 border-b border-slate-100">
           <div className="pb-3 px-4 text-xs font-bold border-b-2 border-amber-500 text-amber-600 flex items-center gap-2">
             <FileText className="w-4 h-4" />
-            Importar PDF SAGA Completo (39 Páginas)
+            Importe do SAGA em PDF
           </div>
         </div>
 

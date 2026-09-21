@@ -9,8 +9,59 @@ import { DataImportExportModal } from './components/DataImportExportModal';
 import { EMPTY_OPERATORS, EMPTY_KPIS } from './data/productivityData';
 import { OperatorSummary, DashboardKPIs, PeriodPreset } from './types';
 import { ouvirRankingRealtime, carregarCacheLocal } from './services/firebase';
-import { normalizarAtividade } from './utils/rankingPdfParser';
+import { normalizarAtividade, parseDataBRTimestamp } from './utils/rankingPdfParser';
 import { obterTurnoColaborador } from './utils/turnos';
+
+function formatarFrasePeriodo(label: string | null | undefined, operators: OperatorSummary[]): string {
+  // Se o rótulo já contém a frase completa solicitada
+  if (label && /in[íi]cio\s+do\s+per[íi]odo/i.test(label)) {
+    return label;
+  }
+
+  // Tenta extrair as datas dos registros dos colaboradores
+  const datasSet = new Set<string>();
+  if (operators && operators.length > 0) {
+    for (const op of operators) {
+      if (op.dataInicio && /^\d{2}\/\d{2}\/\d{4}$/.test(op.dataInicio)) {
+        datasSet.add(op.dataInicio);
+      }
+      if (op.dataFim && /^\d{2}\/\d{2}\/\d{4}$/.test(op.dataFim)) {
+        datasSet.add(op.dataFim);
+      }
+      if (op.datas && Array.isArray(op.datas)) {
+        op.datas.forEach((d) => {
+          if (/^\d{2}\/\d{2}\/\d{4}$/.test(d.trim())) datasSet.add(d.trim());
+        });
+      }
+      if (op.registrosDetalhados && Array.isArray(op.registrosDetalhados)) {
+        op.registrosDetalhados.forEach((r: any) => {
+          if (r && r.data && /^\d{2}\/\d{2}\/\d{4}$/.test(String(r.data).trim())) {
+            datasSet.add(String(r.data).trim());
+          }
+        });
+      }
+    }
+  }
+
+  // Se o label anterior continha datas no formato DD/MM/AAAA
+  if (label) {
+    const matches = label.match(/\b\d{2}\/\d{2}\/\d{4}\b/g);
+    if (matches) {
+      matches.forEach((d) => datasSet.add(d));
+    }
+  }
+
+  const list = Array.from(datasSet).filter((d) => parseDataBRTimestamp(d) > 0);
+  if (list.length > 0) {
+    list.sort((a, b) => parseDataBRTimestamp(a) - parseDataBRTimestamp(b));
+    const dInicio = list[0];
+    const dFim = list[list.length - 1];
+    return `início do período ${dInicio} ao fim do período ${dFim}`;
+  }
+
+  // Exemplo e padrão real para período
+  return "início do período 02/01/2026 ao fim do período 20/09/2026";
+}
 
 export default function App() {
   const [periodPreset, setPeriodPreset] = useState<PeriodPreset>('reference');
@@ -27,7 +78,10 @@ export default function App() {
   });
   const [customLabel, setCustomLabel] = useState<string | null>(() => {
     const cached = carregarCacheLocal();
-    return cached ? cached.label : null;
+    if (cached) {
+      return formatarFrasePeriodo(cached.label, cached.operators);
+    }
+    return null;
   });
   const [isFirebaseConnected, setIsFirebaseConnected] = useState<boolean>(true);
 
@@ -38,7 +92,7 @@ export default function App() {
         if (data && data.operators && data.operators.length > 0) {
           console.log("[Firebase Realtime Database] Dados recebidos em tempo real:", data);
           setCustomOperators(data.operators);
-          setCustomLabel(data.label || `SAGA (${data.operators.length} Colab.)`);
+          setCustomLabel(formatarFrasePeriodo(data.label, data.operators));
         }
         setIsFirebaseConnected(true);
       },
@@ -192,7 +246,7 @@ export default function App() {
           productivity: dataset[dataset.length - 1]?.totalProductivity || 0
         },
         topActivity: `${bestAct} (${maxActCount.toLocaleString('pt-BR')})`,
-        periodLabel: (customLabel || "Relatório SAGA") + shiftSuffix,
+        periodLabel: formatarFrasePeriodo(customLabel, rawActiveOperators) + shiftSuffix,
         siteLabel: "3 COR - BH"
       };
     }

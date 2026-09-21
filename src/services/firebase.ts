@@ -20,6 +20,8 @@ export const rtdb = getDatabase(app);
 export interface FirebaseRankingData {
   operators: OperatorSummary[];
   label: string;
+  dataInicio?: string;
+  dataFim?: string;
   updatedAt: string;
   totalOperators: number;
   totalProductivity: number;
@@ -52,7 +54,9 @@ function sanitizeForFirebase(obj: any): any {
  */
 export async function salvarRankingRealtime(
   operators: OperatorSummary[],
-  label: string
+  label: string,
+  dataInicio?: string,
+  dataFim?: string
 ): Promise<void> {
   const totalProd = operators.reduce((acc, curr) => acc + curr.totalProductivity, 0);
   const totalMov = operators.reduce((acc, curr) => acc + curr.movements, 0);
@@ -60,6 +64,8 @@ export async function salvarRankingRealtime(
   const payload: FirebaseRankingData = {
     operators,
     label,
+    dataInicio,
+    dataFim,
     updatedAt: new Date().toISOString(),
     totalOperators: operators.length,
     totalProductivity: totalProd,
