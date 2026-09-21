@@ -209,9 +209,11 @@ export const DataImportExportModal: React.FC<DataImportExportModalProps> = ({
           const prod = parseInt(parts[1].replace(/\./g, '').replace(/,/g, ''), 10);
           if (name && !isNaN(prod)) {
             const mov = parts[2] ? parseInt(parts[2], 10) : Math.round(prod / 110);
+            const turnoIdentificado = obterTurnoColaborador(name);
             parsed.push({
               rank: idx + 1,
               name: name.toUpperCase(),
+              turno: turnoIdentificado,
               totalProductivity: prod,
               movements: mov || 20,
               participation: 0, // will calculate below
@@ -324,10 +326,10 @@ export const DataImportExportModal: React.FC<DataImportExportModalProps> = ({
                     Selecione ou Arraste o Relatório PDF Oficial do SAGA
                   </p>
                   <p className="text-xs text-slate-500 mt-1 max-w-md">
-                    O parser lê automaticamente todas as 39 páginas do PDF, sem limite de colaboradores, somando registros por colaborador e atividade.
+                    O parser lê automaticamente todas as páginas do PDF, somando a coluna "qtd. Ordens", identificando os turnos (A, B, C, ADM, RANDS) e <strong>substituindo integralmente todos os dados anteriores</strong>.
                   </p>
                   <span className="mt-3 px-3 py-1 bg-amber-100 text-amber-900 rounded-full text-[11px] font-bold">
-                    Parser Nativo de PDF Ativo (Sem limite de 25)
+                    Substituição Total • Realtime Database Sincronizado
                   </span>
                 </>
               )}
