@@ -1,8 +1,9 @@
 import React, { useState, useMemo } from 'react';
-import { Search, Filter, ArrowUp, ArrowDown, ChevronDown, Check, Trophy, Sparkles, Activity, ShieldCheck, X, RotateCcw, Clock } from 'lucide-react';
+import { Search, Filter, ArrowUp, ArrowDown, ChevronDown, Check, Trophy, Sparkles, Activity, ShieldCheck, X, RotateCcw, Clock, Edit3 } from 'lucide-react';
 import { OperatorSummary } from '../types';
 import { normalizarAtividade, RankingColaborador, RankingRow } from '../utils/rankingPdfParser';
 import { TURNOS_DISPONIVEIS, obterTurnoColaborador, obterEstiloVisualTurno } from '../utils/turnos';
+import { ModalEditarTurno } from './ModalEditarTurno';
 
 interface LayerRankingTableProps {
   operators: OperatorSummary[];
@@ -13,6 +14,7 @@ interface LayerRankingTableProps {
   onSelectOperator: (name: string) => void;
   selectedOperator: string | null;
   onOpenShowcase?: (operatorName?: string) => void;
+  onUpdateOperatorTurno?: (operatorName: string, newTurno: string) => void;
 }
 
 export const LayerRankingTable: React.FC<LayerRankingTableProps> = ({
@@ -23,12 +25,14 @@ export const LayerRankingTable: React.FC<LayerRankingTableProps> = ({
   onSelectTurno,
   onSelectOperator,
   selectedOperator,
-  onOpenShowcase
+  onOpenShowcase,
+  onUpdateOperatorTurno
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [localTurno, setLocalTurno] = useState('TODOS');
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   const [sortBy, setSortBy] = useState<'produtividade' | 'movimentacoes' | 'nome'>('produtividade');
+  const [editingTurnoOperator, setEditingTurnoOperator] = useState<{ name: string; currentTurno?: string } | null>(null);
 
   const activeTurno = selectedTurno !== undefined ? selectedTurno : localTurno;
   const handleTurnoChange = (t: string) => {
@@ -567,15 +571,27 @@ export const LayerRankingTable: React.FC<LayerRankingTableProps> = ({
           </div>
         </div>
 
-        {/* Resumo do Turno Ativo */}
-        <div className="flex items-center gap-2 text-xs font-bold text-slate-500 pr-1">
+        {/* Resumo do Turno Ativo e Botão de Editar Turnos */}
+        <div className="flex items-center gap-3 text-xs font-bold text-slate-500 pr-1">
           <span>Mostrando: <strong className="text-slate-900">{filteredOperators.length}</strong> de <strong className="text-slate-900">{operators.length}</strong> colaboradores</span>
           {activeTurno !== 'TODOS' && (
             <button
               onClick={() => handleTurnoChange('TODOS')}
-              className="text-[11px] font-black text-amber-600 hover:text-amber-700 underline cursor-pointer ml-1"
+              className="text-[11px] font-black text-amber-600 hover:text-amber-700 underline cursor-pointer"
             >
               Ver Todos os Turnos
+            </button>
+          )}
+
+          {onUpdateOperatorTurno && (
+            <button
+              type="button"
+              onClick={() => setEditingTurnoOperator({ name: selectedOperator || operators[0]?.name || '', currentTurno: '' })}
+              className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-[11px] uppercase tracking-wider shadow-sm transition-all cursor-pointer hover:shadow-md"
+              title="Clique para editar o turno de qualquer colaborador"
+            >
+              <Edit3 className="w-3 h-3 stroke-[2.5]" />
+              <span>Editar Turnos</span>
             </button>
           )}
         </div>
@@ -655,7 +671,7 @@ export const LayerRankingTable: React.FC<LayerRankingTableProps> = ({
                   )}
                 </div>
 
-                {/* 2. COLABORADOR COM BADGE DE TURNO */}
+                {/* 2. COLABORADOR COM BADGE DE TURNO EDITÁVEL */}
                 <div className="flex items-center gap-2 pr-2 overflow-hidden">
                   <span className="text-[13.5px] font-black text-slate-900 tracking-tight uppercase truncate font-heading">
                     {op.name}
@@ -663,7 +679,20 @@ export const LayerRankingTable: React.FC<LayerRankingTableProps> = ({
                   {(() => {
                     const turno = op.turno || obterTurnoColaborador(op.name);
                     const turnoStyle = obterEstiloVisualTurno(turno);
-                    return (
+                    return onUpdateOperatorTurno ? (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingTurnoOperator({ name: op.name, currentTurno: turno });
+                        }}
+                        title={`Clique para alterar o turno de ${op.name}`}
+                        className={`group/badge flex items-center gap-1 px-2 py-0.5 rounded-md text-[9.5px] font-black uppercase tracking-wider shrink-0 border shadow-2xs transition-all hover:scale-105 hover:ring-2 hover:ring-amber-400 cursor-pointer ${turnoStyle.badgeBg} ${turnoStyle.badgeText} ${turnoStyle.badgeBorder}`}
+                      >
+                        <span>{turnoStyle.tag}</span>
+                        <Edit3 className="w-2.5 h-2.5 opacity-60 group-hover/badge:opacity-100 transition-opacity" />
+                      </button>
+                    ) : (
                       <span className={`px-2 py-0.5 rounded-md text-[9.5px] font-black uppercase tracking-wider shrink-0 border shadow-2xs ${turnoStyle.badgeBg} ${turnoStyle.badgeText} ${turnoStyle.badgeBorder}`}>
                         {turnoStyle.tag}
                       </span>
@@ -752,6 +781,26 @@ export const LayerRankingTable: React.FC<LayerRankingTableProps> = ({
         </span>
         <span className="text-[11px] font-semibold text-slate-400">Produtividade calculada com base na coluna Qtd. Ordens do PDF</span>
       </div>
+
+      {/* Modal de Edição de Turno */}
+      <ModalEditarTurno
+        isOpen={editingTurnoOperator !== null}
+        onClose={() => setEditingTurnoOperator(null)}
+        operatorName={editingTurnoOperator?.name || null}
+        currentTurno={editingTurnoOperator?.currentTurno}
+        allOperators={operators}
+        onSelectOperator={(name) => {
+          const found = operators.find((o) => o.name.toUpperCase() === name.toUpperCase());
+          setEditingTurnoOperator({
+            name,
+            currentTurno: found?.turno || obterTurnoColaborador(name)
+          });
+        }}
+        onSaveTurno={(name, newTurno) => {
+          onUpdateOperatorTurno?.(name, newTurno);
+          setEditingTurnoOperator({ name, currentTurno: newTurno });
+        }}
+      />
     </div>
   );
 };

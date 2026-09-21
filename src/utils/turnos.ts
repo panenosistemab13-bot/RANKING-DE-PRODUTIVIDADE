@@ -105,6 +105,40 @@ Object.entries(COLABORADORES_TURNOS_MAP).forEach(([nome, turno]) => {
   MAPA_NORMALIZADO.set(normalizarNomeParaBusca(nome), turno);
 });
 
+const LOCAL_STORAGE_KEY_TURNOS_CUSTOM = 'saga_ranking_turnos_customizados';
+
+/**
+ * Carrega o mapa de turnos customizados manualmente pelo usuário
+ */
+export function carregarTurnosCustomizados(): Record<string, string> {
+  try {
+    const raw = localStorage.getItem(LOCAL_STORAGE_KEY_TURNOS_CUSTOM);
+    if (raw) {
+      return JSON.parse(raw);
+    }
+  } catch (e) {
+    console.warn("Erro ao carregar turnos customizados:", e);
+  }
+  return {};
+}
+
+/**
+ * Salva a alteração manual de turno de um colaborador no LocalStorage
+ * e atualiza o mapa em memória
+ */
+export function salvarTurnoCustomizado(nome: string, turno: string): void {
+  try {
+    const mapa = carregarTurnosCustomizados();
+    const norm = normalizarNomeParaBusca(nome);
+    mapa[norm] = turno;
+    mapa[nome.trim().toUpperCase()] = turno;
+    localStorage.setItem(LOCAL_STORAGE_KEY_TURNOS_CUSTOM, JSON.stringify(mapa));
+    MAPA_NORMALIZADO.set(norm, turno);
+  } catch (e) {
+    console.warn("Erro ao salvar turno customizado:", e);
+  }
+}
+
 /**
  * Identifica o turno de um colaborador dado seu nome
  */
@@ -112,6 +146,15 @@ export function obterTurnoColaborador(nome?: string): string {
   if (!nome) return "OUTROS";
   const norm = normalizarNomeParaBusca(nome);
   if (!norm) return "OUTROS";
+
+  // 0. Verifica primeiro se há turno customizado pelo usuário
+  const customMap = carregarTurnosCustomizados();
+  if (customMap[norm]) {
+    return customMap[norm];
+  }
+  if (customMap[nome.trim().toUpperCase()]) {
+    return customMap[nome.trim().toUpperCase()];
+  }
 
   // 1. Busca exata direta
   if (MAPA_NORMALIZADO.has(norm)) {

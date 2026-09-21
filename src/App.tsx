@@ -8,9 +8,9 @@ import { LayerCinematicShowcase } from './components/LayerCinematicShowcase';
 import { DataImportExportModal } from './components/DataImportExportModal';
 import { EMPTY_OPERATORS, EMPTY_KPIS } from './data/productivityData';
 import { OperatorSummary, DashboardKPIs, PeriodPreset } from './types';
-import { ouvirRankingRealtime, carregarCacheLocal } from './services/firebase';
+import { ouvirRankingRealtime, carregarCacheLocal, salvarRankingRealtime } from './services/firebase';
 import { normalizarAtividade, parseDataBRTimestamp } from './utils/rankingPdfParser';
-import { obterTurnoColaborador } from './utils/turnos';
+import { obterTurnoColaborador, salvarTurnoCustomizado } from './utils/turnos';
 
 function formatarFrasePeriodo(label: string | null | undefined, operators: OperatorSummary[]): string {
   // Se o rótulo já contém a frase completa solicitada
@@ -292,6 +292,35 @@ export default function App() {
     setPeriodPreset(preset);
   };
 
+  const handleUpdateOperatorTurno = (operatorName: string, newTurno: string) => {
+    // 1. Salva a customização no localStorage e atualiza o mapa em memória
+    salvarTurnoCustomizado(operatorName, newTurno);
+
+    // 2. Atualiza a lista ativa de operadores no estado React
+    const currentList = customOperators ? [...customOperators] : [...rawActiveOperators];
+    const updated = currentList.map((op) => {
+      if (op.name.toUpperCase() === operatorName.toUpperCase()) {
+        return {
+          ...op,
+          turno: newTurno
+        };
+      }
+      return op;
+    });
+
+    setCustomOperators(updated);
+
+    // 3. Persiste no Firebase Realtime Database
+    salvarRankingRealtime(
+      updated,
+      customLabel || currentKPIs.periodLabel || 'Relatório SAGA',
+      updated[0]?.dataInicio,
+      updated[0]?.dataFim
+    ).catch((err) => {
+      console.warn('Erro ao salvar alteração de turno no Firebase:', err);
+    });
+  };
+
   return (
     <div className="app-viewport select-none">
       {/* 
@@ -338,6 +367,7 @@ export default function App() {
                 initialOperatorName={selectedOperator}
                 selectedTurno={selectedTurno}
                 onSelectTurno={setSelectedTurno}
+                onUpdateOperatorTurno={handleUpdateOperatorTurno}
               />
             </section>
           ) : (
@@ -396,6 +426,7 @@ export default function App() {
                     if (opName) setSelectedOperator(opName);
                     setViewMode('showcase');
                   }}
+                  onUpdateOperatorTurno={handleUpdateOperatorTurno}
                 />
               </section>
             </div>

@@ -10,10 +10,12 @@ import {
   Layers,
   ArrowRight,
   TableProperties,
-  Clock
+  Clock,
+  Edit3
 } from 'lucide-react';
 import { OperatorSummary, DashboardKPIs } from '../types';
 import { CollaboratorCard3D } from './CollaboratorCard3D';
+import { ModalEditarTurno } from './ModalEditarTurno';
 
 interface LayerCinematicShowcaseProps {
   operators: OperatorSummary[];
@@ -23,6 +25,7 @@ interface LayerCinematicShowcaseProps {
   initialOperatorName?: string | null;
   selectedTurno?: string;
   onSelectTurno?: (turno: string) => void;
+  onUpdateOperatorTurno?: (operatorName: string, newTurno: string) => void;
 }
 
 export const LayerCinematicShowcase: React.FC<LayerCinematicShowcaseProps> = ({
@@ -32,7 +35,8 @@ export const LayerCinematicShowcase: React.FC<LayerCinematicShowcaseProps> = ({
   onSelectOperator,
   initialOperatorName,
   selectedTurno = 'TODOS',
-  onSelectTurno
+  onSelectTurno,
+  onUpdateOperatorTurno
 }) => {
   // Current index in operators array (0 to operators.length - 1)
   const [currentIndex, setCurrentIndex] = useState(() => {
@@ -46,6 +50,7 @@ export const LayerCinematicShowcase: React.FC<LayerCinematicShowcaseProps> = ({
   // Showcase view type: 'podium' (exact 3 cards isolated together like the image) OR 'single' (1 by 1 carousel)
   const [showcaseMode, setShowcaseMode] = useState<'podium' | 'single'>('podium');
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isEditingTurno, setIsEditingTurno] = useState(false);
   const autoPlayTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const totalOperators = operators.length;
@@ -454,10 +459,24 @@ export const LayerCinematicShowcase: React.FC<LayerCinematicShowcaseProps> = ({
                 {/* Spotlight Ground Reflection */}
                 <div className="absolute -bottom-8 w-[420px] h-[36px] bg-gradient-to-r from-transparent via-amber-400/45 to-transparent rounded-full blur-xl pointer-events-none" />
 
-                {/* Rank Header Pill */}
-                <div className="mb-4 flex items-center gap-2 px-5 py-1.5 rounded-full bg-gradient-to-r from-amber-500 to-amber-600 text-white font-black text-xs uppercase tracking-widest shadow-xl border border-amber-300/60">
-                  <Trophy className="w-3.5 h-3.5" />
-                  <span>COLABORADOR #{currentRank} DE {totalOperators}</span>
+                {/* Rank Header Pill + Botão Alterar Turno */}
+                <div className="mb-4 flex items-center gap-3">
+                  <div className="flex items-center gap-2 px-5 py-1.5 rounded-full bg-gradient-to-r from-amber-500 to-amber-600 text-white font-black text-xs uppercase tracking-widest shadow-xl border border-amber-300/60">
+                    <Trophy className="w-3.5 h-3.5" />
+                    <span>COLABORADOR #{currentRank} DE {totalOperators}</span>
+                  </div>
+
+                  {onUpdateOperatorTurno && currentOperator && (
+                    <button
+                      type="button"
+                      onClick={() => setIsEditingTurno(true)}
+                      title={`Editar turno de ${currentOperator.name}`}
+                      className="flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-slate-900/80 hover:bg-amber-500 hover:text-slate-950 text-amber-300 border border-amber-400/50 font-black text-xs uppercase tracking-wider shadow-xl backdrop-blur-md transition-all cursor-pointer hover:scale-105"
+                    >
+                      <Clock className="w-3.5 h-3.5" />
+                      <span>Alterar Turno</span>
+                    </button>
+                  )}
                 </div>
 
                 {/* The 3D Metallic Card itself */}
@@ -618,6 +637,22 @@ export const LayerCinematicShowcase: React.FC<LayerCinematicShowcaseProps> = ({
           criado por Jefferson Augusto 10-85447
         </p>
       </div>
+
+      {/* Modal de Edição de Turno */}
+      <ModalEditarTurno
+        isOpen={isEditingTurno}
+        onClose={() => setIsEditingTurno(false)}
+        operatorName={currentOperator?.name || null}
+        currentTurno={currentOperator?.turno}
+        allOperators={operators}
+        onSelectOperator={(name) => {
+          const idx = operators.findIndex((o) => o.name.toUpperCase() === name.toUpperCase());
+          if (idx !== -1) setCurrentIndex(idx);
+        }}
+        onSaveTurno={(name, newTurno) => {
+          onUpdateOperatorTurno?.(name, newTurno);
+        }}
+      />
     </div>
   );
 };
