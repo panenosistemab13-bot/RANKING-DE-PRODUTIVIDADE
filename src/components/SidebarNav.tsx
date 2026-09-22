@@ -18,12 +18,18 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
     <aside className="w-[84px] h-full flex flex-col items-center py-6 border-r border-white/40 bg-white/40 backdrop-blur-xl z-20 shrink-0 select-none">
       {/* 3 Corações Brand Logo */}
       <div className="flex flex-col items-center mb-8 group cursor-pointer" onClick={() => onSelectTab('ranking')}>
-        <img 
-          src="https://lh3.googleusercontent.com/d/1vSNz-PVse-A8gnCp0ivV6feBT5lkM9lh" 
-          alt="3 Corações" 
-          className="w-16 h-auto object-contain mix-blend-multiply group-hover:scale-105 transition-transform duration-200"
+        <img
+          src="/src/assets/images/tres_coracoes_badge_1790081482199.jpg"
+          alt="3 Corações Badge 3D"
           referrerPolicy="no-referrer"
+          className="w-14 h-14 object-cover rounded-2xl shadow-lg border-2 border-amber-400/80 group-hover:scale-110 transition-transform duration-200"
         />
+        <span className="text-[11px] font-black tracking-tight text-slate-900 mt-2 leading-none uppercase">
+          3 Corações
+        </span>
+        <span className="text-[8px] font-black text-amber-700 tracking-tight mt-1 uppercase">
+          Mais que café
+        </span>
       </div>
 
       {/* Navigation Icons Menu */}

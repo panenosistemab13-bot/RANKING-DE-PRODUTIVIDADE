@@ -56,14 +56,22 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({
     <header className="w-full flex items-center justify-between px-8 pt-5 pb-2 z-20 shrink-0">
       {/* Esquerda: Logo 3 Corações + Título do Dashboard */}
       <div className="flex items-center gap-5">
-        {/* Logo Oficial 3 Corações */}
-        <div className="flex items-center pr-5 border-r border-slate-300/70">
-          <img 
-            src="https://lh3.googleusercontent.com/d/1vSNz-PVse-A8gnCp0ivV6feBT5lkM9lh" 
-            alt="3 Corações" 
-            className="h-12 w-auto object-contain mix-blend-multiply"
+        {/* Logo Oficial 3 Corações 4K 3D */}
+        <div className="flex items-center gap-3.5 pr-6 border-r border-slate-300/80">
+          <img
+            src="/src/assets/images/tres_coracoes_badge_1790081482199.jpg"
+            alt="Ícone 3D 3 Corações"
             referrerPolicy="no-referrer"
+            className="w-14 h-14 object-cover rounded-2xl shadow-xl shadow-orange-600/20 border-2 border-amber-400/80 hover:scale-105 transition-all shrink-0"
           />
+          <div className="flex flex-col justify-center">
+            <span className="text-[22px] font-black text-[#0f2444] leading-none tracking-tight font-heading uppercase drop-shadow-xs">
+              3 CORAÇÕES
+            </span>
+            <span className="text-[11px] font-black text-amber-700 tracking-wider uppercase mt-1 leading-none">
+              MAIS QUE CAFÉ, RELAÇÕES
+            </span>
+          </div>
         </div>
 
         <div>
