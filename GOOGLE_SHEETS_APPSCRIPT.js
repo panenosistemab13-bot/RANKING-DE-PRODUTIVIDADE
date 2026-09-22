@@ -103,9 +103,16 @@ function sincronizarComFirebase() {
     h.includes('NOME')
   );
 
+  let idxAtividade = headers.findIndex(h => 
+    h.includes('ATIVIDADE') || h.includes('ATIV') || 
+    h.includes('PROCESSO') || h.includes('SERVICO') || h.includes('SERVIÇO') ||
+    h.includes('OPERACAO') || h.includes('OPERAÇÃO')
+  );
+
   let idxUma = headers.findIndex(h => 
+    h.includes('UMA DESTINO') || h.includes('UMA_DESTINO') ||
     h.includes('UMA ORIGEM') || h.includes('UMA_ORIGEM') || 
-    h.includes('ORIGEM') || h.includes('UMA')
+    h.includes('DESTINO') || h.includes('ORIGEM') || h.includes('UMA')
   );
 
   let idxProd = headers.findIndex(h => 
@@ -115,64 +122,114 @@ function sincronizarComFirebase() {
     h.includes('PEÇAS') || h.includes('PECAS')
   );
 
+  let idxData = headers.findIndex(h => 
+    h.includes('DATA') || h.includes('HORA') || h.includes('TIMESTAMP')
+  );
+
   let idxTurno = headers.findIndex(h => h.includes('TURNO'));
 
   const rankingMap = {};
   const turnosMap = {};
+  const activitiesSet = new Set();
+  let minDataStr = "";
+  let maxDataStr = "";
 
-  // Caso 1: Planilha com registros de UMA por Funcionário (deduplicação SAGA)
-  if (idxFunc !== -1 && idxUma !== -1) {
-    for (let i = 1; i < data.length; i++) {
-      const row = data[i];
-      if (!row || row.join('').trim() === '') continue;
-      const func = String(row[idxFunc] || '').trim().toUpperCase();
-      const uma = String(row[idxUma] || '').trim().toUpperCase();
-      if (func && uma) {
-        if (!rankingMap[func]) rankingMap[func] = {};
-        rankingMap[func][uma] = true;
-        if (idxTurno !== -1 && row[idxTurno]) {
-          turnosMap[func] = String(row[idxTurno]).trim().toUpperCase();
-        }
-      }
-    }
-  } 
-  // Caso 2: Planilha com Totais diretos (Coluna Funcionário + Coluna Produtividade)
-  else if (idxFunc !== -1 && idxProd !== -1) {
-    for (let i = 1; i < data.length; i++) {
-      const row = data[i];
-      if (!row || row.join('').trim() === '') continue;
-      const func = String(row[idxFunc] || '').trim().toUpperCase();
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    if (!row || row.join('').trim() === '') continue;
+
+    const func = idxFunc !== -1 
+      ? String(row[idxFunc] || '').trim().toUpperCase() 
+      : String(row[0] || '').trim().toUpperCase();
+    if (!func || func === 'TOTAL' || func === 'TOTAL GERAL') continue;
+
+    // Atividade da linha
+    let rawAtv = idxAtividade !== -1 ? String(row[idxAtividade] || '').trim().toUpperCase() : 'MOVIMENTACAO';
+    if (!rawAtv) rawAtv = 'MOVIMENTACAO';
+    activitiesSet.add(rawAtv);
+
+    // UMA se houver
+    const uma = idxUma !== -1 ? String(row[idxUma] || '').trim().toUpperCase() : '';
+
+    // Quantidade se houver coluna de produtividade direta
+    let prodQtd = 1;
+    if (idxProd !== -1 && row[idxProd] !== undefined && row[idxProd] !== '') {
       const rawVal = row[idxProd];
-      const prod = typeof rawVal === 'number' ? rawVal : (parseInt(String(rawVal || '').replace(/\D/g, ''), 10) || 0);
-      if (func) {
-        rankingMap[func] = (rankingMap[func] || 0) + prod;
-        if (idxTurno !== -1 && row[idxTurno]) {
-          turnosMap[func] = String(row[idxTurno]).trim().toUpperCase();
-        }
-      }
+      prodQtd = typeof rawVal === 'number' ? rawVal : (parseInt(String(rawVal).replace(/\D/g, ''), 10) || 1);
     }
-  } 
-  // Caso 3: Coluna A = Nome, Coluna B = Quantidade
-  else {
-    for (let i = 1; i < data.length; i++) {
-      const row = data[i];
-      if (!row || row.join('').trim() === '') continue;
-      const colA = String(row[0] || '').trim().toUpperCase();
-      const colB = row[1];
-      const prod = typeof colB === 'number' ? colB : (parseInt(String(colB || '').replace(/\D/g, ''), 10) || 0);
-      if (colA && colA !== 'TOTAL' && colA !== 'TOTAL GERAL') {
-        rankingMap[colA] = (rankingMap[colA] || 0) + (prod || 1);
+
+    if (!rankingMap[func]) {
+      rankingMap[func] = {
+        allUmas: {},
+        umaPerActivity: {},
+        countPerActivity: {},
+        totalCount: 0
+      };
+    }
+
+    if (idxTurno !== -1 && row[idxTurno]) {
+      turnosMap[func] = String(row[idxTurno]).trim().toUpperCase();
+    }
+
+    if (uma) {
+      rankingMap[func].allUmas[uma] = true;
+      if (!rankingMap[func].umaPerActivity[rawAtv]) {
+        rankingMap[func].umaPerActivity[rawAtv] = {};
+      }
+      rankingMap[func].umaPerActivity[rawAtv][uma] = true;
+    } else {
+      rankingMap[func].countPerActivity[rawAtv] = (rankingMap[func].countPerActivity[rawAtv] || 0) + prodQtd;
+      rankingMap[func].totalCount += prodQtd;
+    }
+
+    // Datas
+    if (idxData !== -1 && row[idxData]) {
+      const d = row[idxData];
+      let dStr = '';
+      if (d instanceof Date) {
+        dStr = Utilities.formatDate(d, Session.getScriptTimeZone(), 'dd/MM/yyyy');
+      } else {
+        dStr = String(d).trim();
+      }
+      if (dStr) {
+        if (!minDataStr) minDataStr = dStr;
+        maxDataStr = dStr;
       }
     }
   }
 
-  // Gera a lista de operadores formatada
+  // Gera a lista de operadores formatada com detalhamento por atividade
+  const activitiesList = Array.from(activitiesSet).sort();
   const operators = Object.keys(rankingMap).map(nome => {
-    let totalProd = 0;
-    if (typeof rankingMap[nome] === 'object') {
-      totalProd = Object.keys(rankingMap[nome]).length;
-    } else {
-      totalProd = rankingMap[nome];
+    const info = rankingMap[nome];
+    const hasUmas = Object.keys(info.allUmas).length > 0;
+    const totalProd = hasUmas ? Object.keys(info.allUmas).length : (info.totalCount || 1);
+
+    const activitiesCount = {};
+    let topAtv = "";
+    let maxAtvCount = -1;
+
+    activitiesList.forEach(atv => {
+      const safeKey = atv.replace(/[\.\#\$\/\[\]]/g, '_');
+      let count = 0;
+      if (info.umaPerActivity[atv]) {
+        count = Object.keys(info.umaPerActivity[atv]).length;
+      } else if (info.countPerActivity[atv]) {
+        count = info.countPerActivity[atv];
+      }
+      if (count > 0) {
+        activitiesCount[safeKey] = count;
+        if (count > maxAtvCount) {
+          maxAtvCount = count;
+          topAtv = atv;
+        }
+      }
+    });
+
+    if (!topAtv) {
+      topAtv = activitiesList[0] || "MOVIMENTACAO";
+      const safeKey = topAtv.replace(/[\.\#\$\/\[\]]/g, '_');
+      activitiesCount[safeKey] = totalProd;
     }
 
     const t = turnosMap[nome] || "A";
@@ -190,8 +247,8 @@ function sincronizarComFirebase() {
       totalProductivity: totalProd,
       movements: totalProd,
       turno: t,
-      topActivity: "MOVIMENTAÇÃO UMA",
-      activitiesCount: { "MOVIMENTAÇÃO UMA": totalProd },
+      topActivity: topAtv,
+      activitiesCount: activitiesCount,
       sparkline: spark,
       trendGrowth: 8.5
     };
@@ -205,18 +262,22 @@ function sincronizarComFirebase() {
 
   const horaAtual = new Date().toLocaleTimeString('pt-BR');
   const label = "Atualizado em tempo real da Planilha Google às " + horaAtual;
-  enviarAoFirebase(operators, label);
+  enviarAoFirebase(operators, label, activitiesList, minDataStr, maxDataStr);
 }
 
 /**
  * Envia o payload atualizado via PUT direto para o Firebase Realtime Database
  */
-function enviarAoFirebase(operators, label) {
+function enviarAoFirebase(operators, label, activitiesList, dataInicio, dataFim) {
+  const totalProd = operators.reduce((acc, op) => acc + (op.totalProductivity || 0), 0);
   const payload = {
     operators: operators,
+    activities: activitiesList || [],
     label: label,
-    dataInicio: "02/01/2026",
-    dataFim: "20/09/2026",
+    dataInicio: dataInicio || "01/09/2026",
+    dataFim: dataFim || "20/09/2026",
+    totalOperators: operators.length,
+    totalProductivity: totalProd,
     timestamp: new Date().getTime(),
     updatedAt: new Date().toISOString()
   };

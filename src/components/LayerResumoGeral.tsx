@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   TrendingUp,
   FileCheck2,
@@ -10,13 +10,17 @@ import {
   FileUp,
   Calendar,
   Sparkles,
-  BarChart3
+  BarChart3,
+  Crown
 } from 'lucide-react';
-import { DashboardKPIs } from '../types';
+import { DashboardKPIs, OperatorSummary } from '../types';
+import { matchActivity, normalizarAtividade, isMovimentacaoUma } from '../utils/rankingPdfParser';
 
 interface LayerResumoGeralProps {
   kpis: DashboardKPIs;
   variant?: 'left' | 'right' | 'full';
+  operators?: OperatorSummary[];
+  selectedActivity?: string;
   onFilterActivity?: (activity: string) => void;
   onOpenImportPDF?: () => void;
 }
@@ -24,12 +28,55 @@ interface LayerResumoGeralProps {
 export const LayerResumoGeral: React.FC<LayerResumoGeralProps> = ({
   kpis,
   variant = 'full',
+  operators = [],
+  selectedActivity,
   onFilterActivity,
   onOpenImportPDF
 }) => {
   const formatNumber = (val: number) => {
     return val.toLocaleString('pt-BR');
   };
+
+  // Cálculo dos Líderes por Atividade (Coluna B)
+  const activityLeaders = useMemo(() => {
+    if (!operators || operators.length === 0) return [];
+    const activities = ['MOVIMENTACAO', 'APANHA', 'APANHA PALETE', 'CONF CARREG', 'CONF VOLUME', 'GOODS ISSUE'];
+
+    return activities.map((act) => {
+      let maxScore = 0;
+      let topLeader = 'Aguardando';
+
+      operators.forEach((op) => {
+        let score = 0;
+        if (op.registrosDetalhados && op.registrosDetalhados.length > 0) {
+          const matching = op.registrosDetalhados.filter((r) => matchActivity(r.atividade, act));
+          score = matching.reduce((acc, r) => acc + (r.qtdOrdens || 0), 0);
+        } else if (op.activitiesMetrics && typeof op.activitiesMetrics === 'object') {
+          const actNorm = normalizarAtividade(act);
+          let m = op.activitiesMetrics[actNorm];
+          if (!m) {
+            const key = Object.keys(op.activitiesMetrics).find((k) => matchActivity(k, act));
+            if (key) m = op.activitiesMetrics[key];
+          }
+          if (m) score = m.qtdOrdens || 0;
+        } else if (op.activitiesCount) {
+          score = op.activitiesCount[act] || 0;
+        }
+
+        if (score > maxScore) {
+          maxScore = score;
+          topLeader = op.name;
+        }
+      });
+
+      return {
+        activity: act === 'MOVIMENTACAO' ? 'MOVIMENTAÇÃO' : act,
+        filterKey: act,
+        leaderName: topLeader,
+        leaderScore: maxScore
+      };
+    }).filter((item) => item.leaderScore > 0 || ['MOVIMENTAÇÃO', 'APANHA', 'APANHA PALETE'].includes(item.activity));
+  }, [operators]);
 
   // =========================================================================
   // ASA ESQUERDA: MÉTRICAS GERAIS CONSOLIDADAS
@@ -176,39 +223,84 @@ export const LayerResumoGeral: React.FC<LayerResumoGeralProps> = ({
         </div>
 
         {/* Top 2 Metric Cards */}
-        <div className="grid grid-cols-2 gap-2.5 my-auto">
+        <div className="grid grid-cols-2 gap-2.5 my-1">
           {/* Média por Colaborador */}
-          <div className="p-3 rounded-2xl bg-white/75 border border-slate-200/70 shadow-xs flex flex-col justify-between hover:bg-white/95 transition-all">
+          <div className="p-2.5 rounded-2xl bg-white/75 border border-slate-200/70 shadow-xs flex flex-col justify-between hover:bg-white/95 transition-all">
             <div className="flex items-center gap-2 text-indigo-600">
-              <UserCheck className="w-4 h-4" />
-              <span className="text-[10.5px] font-bold text-slate-500 uppercase">
+              <UserCheck className="w-3.5 h-3.5" />
+              <span className="text-[10px] font-bold text-slate-500 uppercase">
                 Média / Colab.
               </span>
             </div>
-            <div className="text-[23px] font-black text-slate-900 tracking-tight font-heading mt-1">
+            <div className="text-[20px] font-black text-slate-900 tracking-tight font-heading mt-0.5">
               {formatNumber(kpis.averagePerOperator)}
             </div>
-            <span className="text-[10px] font-bold text-emerald-600">
+            <span className="text-[9.5px] font-bold text-emerald-600">
               ↑ 10,2% vs meta
             </span>
           </div>
 
           {/* Destaque Maior Produtividade */}
-          <div className="p-3 rounded-2xl bg-white/75 border border-slate-200/70 shadow-xs flex flex-col justify-between hover:bg-white/95 transition-all">
+          <div className="p-2.5 rounded-2xl bg-white/75 border border-slate-200/70 shadow-xs flex flex-col justify-between hover:bg-white/95 transition-all">
             <div className="flex items-center gap-1.5 text-amber-600">
-              <Sparkles className="w-4 h-4" />
-              <span className="text-[10.5px] font-bold text-slate-500 uppercase truncate">
+              <Sparkles className="w-3.5 h-3.5" />
+              <span className="text-[10px] font-bold text-slate-500 uppercase truncate">
                 Líder SAGA
               </span>
             </div>
-            <div className="text-[13px] font-black text-slate-900 truncate mt-1">
+            <div className="text-[12px] font-black text-slate-900 truncate mt-0.5">
               {kpis.topOperator.name.split(' ').slice(0, 2).join(' ')}
             </div>
-            <span className="text-[16px] font-black text-amber-600 font-heading">
+            <span className="text-[15px] font-black text-amber-600 font-heading">
               {formatNumber(kpis.topOperator.productivity)}
             </span>
           </div>
         </div>
+
+        {/* LÍDERES POR ATIVIDADE (COLUNA B) */}
+        {activityLeaders.length > 0 && (
+          <div className="p-2.5 rounded-2xl bg-white/80 border border-amber-200/80 shadow-xs my-1">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-[10px] font-black text-amber-900 uppercase tracking-wider flex items-center gap-1.5 font-heading">
+                <Crown className="w-3.5 h-3.5 text-amber-500 fill-amber-400" />
+                LÍDERES POR ATIVIDADE (COLUNA B)
+              </span>
+              <span className="text-[8.5px] font-extrabold text-amber-800 bg-amber-100/90 px-1.5 py-0.2 rounded-md">
+                CLIQUE PARA FILTRAR
+              </span>
+            </div>
+
+            <div className="grid grid-cols-3 gap-1.5">
+              {activityLeaders.slice(0, 3).map((item) => (
+                <button
+                  key={item.activity}
+                  onClick={() => onFilterActivity && onFilterActivity(item.filterKey)}
+                  className={`p-1.5 rounded-xl border text-left transition-all cursor-pointer group ${
+                    selectedActivity === item.filterKey
+                      ? 'bg-amber-500 text-white border-amber-600 shadow-xs'
+                      : 'bg-amber-50/60 hover:bg-amber-100/80 border-amber-200/60'
+                  }`}
+                >
+                  <span className={`block text-[9px] font-extrabold uppercase truncate ${
+                    selectedActivity === item.filterKey ? 'text-amber-100' : 'text-amber-800'
+                  }`}>
+                    {item.activity}
+                  </span>
+                  <span className={`block text-[10.5px] font-black truncate font-heading ${
+                    selectedActivity === item.filterKey ? 'text-white' : 'text-slate-900 group-hover:text-amber-900'
+                  }`}>
+                    {item.leaderName.split(' ')[0]}
+                  </span>
+                  <span className={`block text-[9.5px] font-bold ${
+                    selectedActivity === item.filterKey ? 'text-amber-200' : 'text-amber-600'
+                  }`}>
+                    {formatNumber(item.leaderScore)} ord.
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* STATUS DA PLANILHA GOOGLE EM TEMPO REAL */}
         <div className="flex items-center justify-center gap-3 px-4 py-3 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 text-white shadow-lg shadow-emerald-700/25 border border-emerald-400/40 select-none">

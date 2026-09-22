@@ -5,13 +5,9 @@ export const EMPTY_OPERATORS: OperatorSummary[] = [];
 
 export const AVAILABLE_ACTIVITIES = [
   'TODAS AS ATIVIDADES',
-  'APANHA',
-  'CONF CARREG',
-  'CONF VOLUME',
-  'GOODS ISSUE',
-  'MOV/EXP',
-  'CONF RECEBIMENTO',
-  'MOVIMENTACAO'
+  'MOVIMENTACAO',
+  'RESSUPRIMENTO',
+  'MOV/EXP'
 ];
 
 export const EMPTY_KPIS: DashboardKPIs = {

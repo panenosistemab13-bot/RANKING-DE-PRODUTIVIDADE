@@ -1,7 +1,7 @@
-import React, { useState, useMemo } from 'react';
-import { Search, Filter, ArrowUp, ArrowDown, ChevronDown, Check, Trophy, Sparkles, Activity, ShieldCheck, X, RotateCcw, Clock, Edit3 } from 'lucide-react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { Search, Filter, ArrowUp, ArrowDown, ChevronDown, Check, Trophy, Sparkles, Activity, ShieldCheck, X, RotateCcw, Clock, Edit3, Crown, Maximize2, Minimize2 } from 'lucide-react';
 import { OperatorSummary } from '../types';
-import { normalizarAtividade, RankingColaborador, RankingRow } from '../utils/rankingPdfParser';
+import { normalizarAtividade, RankingColaborador, RankingRow, isMovimentacaoUma, matchActivity } from '../utils/rankingPdfParser';
 import { TURNOS_DISPONIVEIS, obterTurnoColaborador, obterEstiloVisualTurno } from '../utils/turnos';
 import { ModalEditarTurno } from './ModalEditarTurno';
 
@@ -28,11 +28,47 @@ export const LayerRankingTable: React.FC<LayerRankingTableProps> = ({
   onOpenShowcase,
   onUpdateOperatorTurno
 }) => {
+  const tableRef = useRef<HTMLDivElement>(null);
+  const [isTableFullscreen, setIsTableFullscreen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [localTurno, setLocalTurno] = useState('TODOS');
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   const [sortBy, setSortBy] = useState<'produtividade' | 'movimentacoes' | 'nome'>('produtividade');
   const [editingTurnoOperator, setEditingTurnoOperator] = useState<{ name: string; currentTurno?: string } | null>(null);
+
+  const toggleTableFullscreen = () => {
+    if (!isTableFullscreen) {
+      setIsTableFullscreen(true);
+      if (tableRef.current && tableRef.current.requestFullscreen) {
+        tableRef.current.requestFullscreen().catch(() => {});
+      }
+    } else {
+      setIsTableFullscreen(false);
+      if (document.fullscreenElement && document.exitFullscreen) {
+        document.exitFullscreen().catch(() => {});
+      }
+    }
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isTableFullscreen) {
+        setIsTableFullscreen(false);
+      }
+    };
+    const handleFullscreenChange = () => {
+      if (!document.fullscreenElement && isTableFullscreen) {
+        setIsTableFullscreen(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    };
+  }, [isTableFullscreen]);
 
   const activeTurno = selectedTurno !== undefined ? selectedTurno : localTurno;
   const handleTurnoChange = (t: string) => {
@@ -67,17 +103,18 @@ export const LayerRankingTable: React.FC<LayerRankingTableProps> = ({
     return counts;
   }, [operators]);
 
-  // Extrai dinamicamente todas as atividades reais encontradas no conjunto de dados
+  // Extrai dinamicamente todas as atividades reais encontradas na Coluna (B)
   const availableActivities = useMemo(() => {
     const list: string[] = ['TODAS AS ATIVIDADES'];
     const standard = [
+      'MOVIMENTACAO',
       'APANHA',
+      'APANHA PALETE',
       'CONF CARREG',
       'CONF VOLUME',
       'GOODS ISSUE',
       'MOV/EXP',
       'CONF RECEBIMENTO',
-      'MOVIMENTACAO',
       'INVENTARIO'
     ];
 
@@ -86,34 +123,91 @@ export const LayerRankingTable: React.FC<LayerRankingTableProps> = ({
     operators.forEach((op) => {
       if (op.registrosDetalhados) {
         op.registrosDetalhados.forEach((r) => {
-          if (r.atividade) foundSet.add(r.atividade.trim());
+          if (r.atividade && !isMovimentacaoUma(r.atividade)) {
+            foundSet.add(r.atividade.trim());
+          }
         });
       }
-      if (op.topActivity) {
+      if (op.topActivity && !isMovimentacaoUma(op.topActivity)) {
         foundSet.add(op.topActivity.trim());
       }
       if (op.activitiesCount) {
         Object.keys(op.activitiesCount).forEach((act) => {
-          foundSet.add(act.replace(/_/g, '/').trim());
+          if (!isMovimentacaoUma(act)) {
+            foundSet.add(act.replace(/_/g, '/').trim());
+          }
         });
       }
       if (op.activitiesMetrics) {
         Object.keys(op.activitiesMetrics).forEach((act) => {
-          foundSet.add((act || "").toUpperCase().replace(/_/g, '/').trim());
+          if (!isMovimentacaoUma(act)) {
+            foundSet.add((act || "").toUpperCase().replace(/_/g, '/').trim());
+          }
         });
       }
     });
 
-    standard.forEach((s) => foundSet.add(s));
+    standard.forEach((s) => {
+      if (!isMovimentacaoUma(s)) foundSet.add(s);
+    });
 
     foundSet.forEach((item) => {
-      if (item && (item || "").toUpperCase() !== 'TODAS AS ATIVIDADES') {
+      if (item && (item || "").toUpperCase() !== 'TODAS AS ATIVIDADES' && !isMovimentacaoUma(item)) {
         list.push(item);
       }
     });
 
     return list;
   }, [operators]);
+
+  // Mapeia o Líder de cada Atividade
+  const activityLeadersMap = useMemo(() => {
+    const map: Record<string, { leaderName: string; leaderScore: number; totalVolume: number }> = {};
+
+    availableActivities.forEach((act) => {
+      if (act === 'TODAS AS ATIVIDADES' || isMovimentacaoUma(act)) return;
+
+      let maxScore = -1;
+      let topName = '—';
+      let sumTotal = 0;
+
+      operators.forEach((op) => {
+        let score = 0;
+        if (op.registrosDetalhados && op.registrosDetalhados.length > 0) {
+          const matching = op.registrosDetalhados.filter((r) => matchActivity(r.atividade, act));
+          score = matching.reduce((acc, r) => acc + (r.qtdOrdens || 0), 0);
+        } else if (op.activitiesMetrics && typeof op.activitiesMetrics === 'object') {
+          const actNorm = normalizarAtividade(act);
+          let m = op.activitiesMetrics[actNorm];
+          if (!m) {
+            const key = Object.keys(op.activitiesMetrics).find((k) => matchActivity(k, act));
+            if (key) m = op.activitiesMetrics[key];
+          }
+          if (m) score = m.qtdOrdens || 0;
+        } else if (op.activitiesCount) {
+          score = op.activitiesCount[act] || 0;
+        }
+
+        if (score > 0) {
+          sumTotal += score;
+          if (score > maxScore) {
+            maxScore = score;
+            topName = op.name;
+          }
+        }
+      });
+
+      if (maxScore > 0) {
+        map[act] = {
+          leaderName: topName,
+          leaderScore: maxScore,
+          totalVolume: sumTotal
+        };
+      }
+    });
+
+    return map;
+  }, [operators, availableActivities]);
 
   /*
    * RECALCULA O RANKING A PARTIR DOS REGISTROS INDIVIDUAIS
@@ -368,7 +462,14 @@ export const LayerRankingTable: React.FC<LayerRankingTableProps> = ({
   const isFilterActive = selectedActivity !== 'TODAS AS ATIVIDADES' || searchTerm.trim() !== '' || sortBy !== 'produtividade';
 
   return (
-    <div className="ranking-table-3d w-full h-[510px] p-6 flex flex-col justify-between relative overflow-hidden select-none">
+    <div
+      ref={tableRef}
+      className={`ranking-table-3d transition-all duration-300 select-none ${
+        isTableFullscreen
+          ? 'fixed inset-0 z-[9999] p-6 md:p-8 bg-slate-950/95 backdrop-blur-2xl flex flex-col justify-between overflow-hidden w-screen h-screen shadow-2xl'
+          : 'w-full h-[510px] p-6 flex flex-col justify-between relative overflow-hidden'
+      }`}
+    >
       {/* Table Header: Title + Search + Filter Button */}
       <div className="flex items-center justify-between pb-3.5 border-b border-slate-200/60">
         <div className="flex items-center gap-3.5">
@@ -470,10 +571,10 @@ export const LayerRankingTable: React.FC<LayerRankingTableProps> = ({
 
             {/* Filter Dropdown Menu */}
             {showFilterDropdown && (
-              <div className="absolute right-0 mt-2.5 w-76 rounded-3xl bg-white/95 backdrop-blur-2xl border border-slate-200/90 shadow-2xl p-3.5 z-50 animate-in fade-in zoom-in-95 duration-150">
+              <div className="absolute right-0 mt-2.5 w-84 rounded-3xl bg-white/95 backdrop-blur-2xl border border-slate-200/90 shadow-2xl p-3.5 z-50 animate-in fade-in zoom-in-95 duration-150">
                 <div className="flex items-center justify-between px-2 py-1">
                   <span className="text-[10.5px] font-black uppercase tracking-wider text-slate-400">
-                    Filtrar por Atividade
+                    Filtrar por Atividade (Coluna B)
                   </span>
                   {isFilterActive && (
                     <button
@@ -490,9 +591,11 @@ export const LayerRankingTable: React.FC<LayerRankingTableProps> = ({
                   )}
                 </div>
 
-                <div className="flex flex-col gap-0.5 max-h-56 overflow-y-auto custom-scrollbar my-1">
+                <div className="flex flex-col gap-1 max-h-64 overflow-y-auto custom-scrollbar my-1">
                   {availableActivities.map((act) => {
                     const isSelected = selectedActivity === act;
+                    const leaderInfo = activityLeadersMap[act];
+
                     return (
                       <button
                         key={act}
@@ -506,8 +609,17 @@ export const LayerRankingTable: React.FC<LayerRankingTableProps> = ({
                             : 'text-slate-700 hover:bg-slate-100/80'
                         }`}
                       >
-                        <span className="truncate">{act}</span>
-                        {isSelected && <Check className="w-3.5 h-3.5 shrink-0" />}
+                        <div className="flex flex-col min-w-0 pr-2">
+                          <span className="truncate">{act}</span>
+                          {leaderInfo && (
+                            <span className={`text-[10px] font-medium truncate flex items-center gap-1 ${
+                              isSelected ? 'text-amber-100 font-bold' : 'text-slate-500'
+                            }`}>
+                              👑 Líder: <span className="font-bold">{leaderInfo.leaderName.split(' ').slice(0, 2).join(' ')}</span> ({formatNumber(leaderInfo.leaderScore)})
+                            </span>
+                          )}
+                        </div>
+                        {isSelected && <Check className="w-3.5 h-3.5 shrink-0 ml-1" />}
                       </button>
                     );
                   })}
@@ -603,10 +715,63 @@ export const LayerRankingTable: React.FC<LayerRankingTableProps> = ({
               <span>APRESENTAÇÃO 3D (TECLADO ➔)</span>
             </button>
           )}
+
+          {/* Botão de Tela Cheia para o Ranking Completo */}
+          <button
+            onClick={toggleTableFullscreen}
+            className={`flex items-center gap-2 px-3.5 py-2.5 rounded-2xl font-black text-xs transition-all cursor-pointer shadow-md border ${
+              isTableFullscreen
+                ? 'bg-rose-600 hover:bg-rose-500 text-white border-rose-400/60 shadow-rose-600/30'
+                : 'bg-slate-900 hover:bg-slate-800 text-amber-400 hover:text-amber-300 border-slate-700 shadow-slate-900/40'
+            }`}
+            title={isTableFullscreen ? "Sair da Tela Cheia (ESC)" : "Expandir Ranking Completo em Tela Cheia"}
+          >
+            {isTableFullscreen ? (
+              <>
+                <Minimize2 className="w-4 h-4 text-rose-200" />
+                <span>SAIR DA TELA CHEIA (ESC)</span>
+              </>
+            ) : (
+              <>
+                <Maximize2 className="w-4 h-4 text-amber-400" />
+                <span>TELA CHEIA</span>
+              </>
+            )}
+          </button>
         </div>
       </div>
 
-      {/* BARRA DE FILTRO DE TURNOS RÁPIDA (TODOS, A, B, C, ADM, RANDS) */}
+      {/* Banner Destaque do Líder da Atividade Selecionada (Coluna B) */}
+      {selectedActivity !== 'TODAS AS ATIVIDADES' && activityLeadersMap[selectedActivity] && (
+        <div className="my-1.5 px-4.5 py-2 rounded-2xl bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-amber-500/15 border border-amber-300/70 flex items-center justify-between text-xs font-bold text-slate-800 shadow-xs animate-in fade-in duration-200">
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center text-white shadow-xs">
+              <Crown className="w-4 h-4 fill-amber-100" />
+            </div>
+            <div>
+              <span className="text-[10px] font-black text-amber-950 uppercase tracking-widest block leading-none font-heading">
+                LÍDER DA ATIVIDADE ({selectedActivity})
+              </span>
+              <span className="text-[14px] font-black text-slate-900 tracking-tight font-heading mt-0.5 block">
+                {activityLeadersMap[selectedActivity].leaderName}
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="text-right">
+              <span className="text-[10px] font-bold text-slate-500 block leading-none">
+                Produtividade do Líder
+              </span>
+              <span className="text-[14px] font-black text-amber-700 tracking-tight font-heading mt-0.5 block">
+                {formatNumber(activityLeadersMap[selectedActivity].leaderScore)} Ordens
+              </span>
+            </div>
+            <span className="text-[10.5px] font-extrabold text-amber-900 bg-amber-100/90 px-3 py-1 rounded-xl border border-amber-200">
+              Total Atividade: {formatNumber(activityLeadersMap[selectedActivity].totalVolume)}
+            </span>
+          </div>
+        </div>
+      )}
       <div className="flex items-center justify-between py-1.5 px-3 bg-slate-100/90 rounded-2xl border border-slate-200/80 my-1 shadow-2xs">
         <div className="flex items-center gap-2">
           <span className="text-[11px] font-black text-slate-500 uppercase tracking-wider flex items-center gap-1">

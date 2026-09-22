@@ -84,6 +84,51 @@ export function normalizarAtividade(
     .toUpperCase();
 }
 
+export function isMovimentacaoUma(atividade: string): boolean {
+  if (!atividade) return false;
+  const norm = normalizarAtividade(atividade);
+  return (
+    norm.includes("MOVIMENTACAO UMA") ||
+    norm.includes("MOVIMENTAÇÃO UMA") ||
+    norm.includes("MOVIMENTACÃO UMA") ||
+    norm.includes("MOVIMENTACAO_UMA") ||
+    norm.includes("MOVIMENTAÇÃO_UMA")
+  );
+}
+
+export function matchActivity(regAtividade: string, targetAtividade: string): boolean {
+  if (!targetAtividade || targetAtividade === "TODAS AS ATIVIDADES") return true;
+  if (!regAtividade) return false;
+
+  const regNorm = normalizarAtividade(regAtividade);
+  const targetNorm = normalizarAtividade(targetAtividade);
+
+  if (isMovimentacaoUma(regNorm) || isMovimentacaoUma(targetNorm)) return false;
+
+  if (regNorm === targetNorm) return true;
+
+  if (targetNorm === "APANHA PALETE" || targetNorm === "APANHA PALETES") {
+    return regNorm.includes("PALET") || regNorm.includes("PALATE");
+  }
+
+  if (targetNorm === "APANHA") {
+    return regNorm.includes("APANHA") && !regNorm.includes("PALET") && !regNorm.includes("PALATE");
+  }
+
+  if (targetNorm === "MOVIMENTACAO" || targetNorm === "MOVIMENTAÇÃO") {
+    return regNorm.includes("MOV") && !regNorm.includes("EXP") && !regNorm.includes("UMA");
+  }
+
+  if (targetNorm.includes("CONF VOLUME") && (regNorm.includes("VOLUME") || regNorm.includes("VOL"))) return true;
+  if (targetNorm.includes("CONF CARREG") && (regNorm.includes("CARREG") || regNorm.includes("CARGA"))) return true;
+  if (targetNorm.includes("CONF RECEB") && (regNorm.includes("RECEB") || regNorm.includes("REC"))) return true;
+  if (targetNorm.includes("MOV EXP") && (regNorm.includes("MOV") && regNorm.includes("EXP"))) return true;
+  if (targetNorm.includes("GOODS ISSUE") && (regNorm.includes("GOODS") || regNorm.includes("ISSUE") || regNorm.includes("BAIXA"))) return true;
+  if (targetNorm.includes("INVENTARIO") && regNorm.includes("INV")) return true;
+
+  return regNorm.includes(targetNorm) || targetNorm.includes(regNorm);
+}
+
 /**
  * Recalcula o ranking a partir dos registros detalhados individuais
  * usando a coluna Qtd. Serv. como produtividade.
@@ -117,25 +162,10 @@ export function filtrarRanking(
             !atividade ||
             atividade === "TODAS AS ATIVIDADES"
           ) {
-            return true;
+            return !isMovimentacaoUma(registro.atividade);
           }
 
-          const regNorm = normalizarAtividade(registro.atividade);
-          const atvNorm = normalizarAtividade(atividade);
-
-          if (regNorm === atvNorm) return true;
-
-          // Suporte a variações e abreviações comuns
-          if (regNorm.includes(atvNorm) || atvNorm.includes(regNorm)) return true;
-          if (atvNorm.includes("CONF VOLUME") && (regNorm.includes("VOLUME") || regNorm.includes("VOL"))) return true;
-          if (atvNorm.includes("CONF CARREG") && (regNorm.includes("CARREG") || regNorm.includes("CARGA"))) return true;
-          if (atvNorm.includes("CONF RECEB") && (regNorm.includes("RECEB") || regNorm.includes("REC"))) return true;
-          if (atvNorm.includes("MOV EXP") && (regNorm.includes("MOV") && regNorm.includes("EXP"))) return true;
-          if (atvNorm.includes("APANHA") && (regNorm.includes("APANHA") || regNorm.includes("SEPAR") || regNorm.includes("PICK"))) return true;
-          if (atvNorm.includes("GOODS ISSUE") && (regNorm.includes("GOODS") || regNorm.includes("ISSUE") || regNorm.includes("BAIXA"))) return true;
-          if (atvNorm.includes("MOVIMENTACAO") && regNorm.includes("MOV")) return true;
-
-          return false;
+          return matchActivity(registro.atividade, atividade);
         }
       );
 
@@ -664,7 +694,7 @@ export async function lerRankingProdutividade(
 
   const atividades = Array.from(
     new Set(registros.map((registro) => registro.atividade))
-  );
+  ).filter((act) => !isMovimentacaoUma(act));
 
   const intervaloDatas = extrairDatasDeTextoOuLinhas(paginas, registros);
 
@@ -1065,7 +1095,7 @@ export async function lerRankingUMA(
 
   const atividades = Array.from(
     new Set(registros.map((r) => r.atividade))
-  );
+  ).filter((act) => !isMovimentacaoUma(act));
 
   // Extrai período e intervalo de datas
   const arrayDatas = Array.from(new Set(registros.map(r => r.data)))

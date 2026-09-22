@@ -19,6 +19,7 @@ export const rtdb = getDatabase(app);
 
 export interface FirebaseRankingData {
   operators: OperatorSummary[];
+  activities?: string[];
   label: string;
   dataInicio?: string;
   dataFim?: string;
@@ -122,16 +123,24 @@ export async function salvarHistoricoImportacao(
 /**
  * Carrega os dados em cache local imediatamente ao abrir o app
  */
-export function carregarCacheLocal(): { operators: OperatorSummary[]; label: string } | null {
+export function carregarCacheLocal(): { operators: OperatorSummary[]; label: string; activities?: string[] } | null {
   try {
     const raw = localStorage.getItem(LOCAL_STORAGE_KEY_OPERATORS);
     const label = localStorage.getItem(LOCAL_STORAGE_KEY_LABEL);
+    const rawActivities = localStorage.getItem('saga_ranking_cached_activities');
+    let activities: string[] | undefined = undefined;
+    if (rawActivities) {
+      try {
+        activities = JSON.parse(rawActivities);
+      } catch {}
+    }
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
         return {
           operators: parsed,
-          label: label || `SAGA (${parsed.length} Colab.)`
+          label: label || `SAGA (${parsed.length} Colab.)`,
+          activities: Array.isArray(activities) ? activities : undefined
         };
       }
     }
@@ -237,14 +246,19 @@ export async function buscarRankingRealtime(): Promise<FirebaseRankingData | nul
       if (val) {
         const rawOps = val.operators ?? [];
         const normalizedOps = normalizarOperadoresFirebase(rawOps);
+        const sheetActivities: string[] = Array.isArray(val.activities) ? val.activities : [];
         const dataObj: FirebaseRankingData = {
           ...val,
-          operators: normalizedOps
+          operators: normalizedOps,
+          activities: sheetActivities
         };
         // Atualiza cache local
         try {
           localStorage.setItem(LOCAL_STORAGE_KEY_OPERATORS, JSON.stringify(normalizedOps));
           localStorage.setItem(LOCAL_STORAGE_KEY_LABEL, val.label || "Planilha Google Oficial");
+          if (sheetActivities.length > 0) {
+            localStorage.setItem('saga_ranking_cached_activities', JSON.stringify(sheetActivities));
+          }
         } catch {}
         return dataObj;
       }
@@ -279,14 +293,19 @@ export function ouvirRankingRealtime(
         if (val) {
           const rawOps = val.operators ?? [];
           const normalizedOps = normalizarOperadoresFirebase(rawOps);
+          const sheetActivities: string[] = Array.isArray(val.activities) ? val.activities : [];
           const dataObj: FirebaseRankingData = {
             ...val,
-            operators: normalizedOps
+            operators: normalizedOps,
+            activities: sheetActivities
           };
           // Atualiza cache local
           try {
             localStorage.setItem(LOCAL_STORAGE_KEY_OPERATORS, JSON.stringify(normalizedOps));
             localStorage.setItem(LOCAL_STORAGE_KEY_LABEL, val.label || "Planilha Google Oficial");
+            if (sheetActivities.length > 0) {
+              localStorage.setItem('saga_ranking_cached_activities', JSON.stringify(sheetActivities));
+            }
           } catch {}
           onData(dataObj);
         }

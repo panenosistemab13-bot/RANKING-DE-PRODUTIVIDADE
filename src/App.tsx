@@ -8,7 +8,7 @@ import { LayerCinematicShowcase } from './components/LayerCinematicShowcase';
 import { EMPTY_OPERATORS, EMPTY_KPIS } from './data/productivityData';
 import { OperatorSummary, DashboardKPIs, PeriodPreset } from './types';
 import { ouvirRankingRealtime, carregarCacheLocal, salvarRankingRealtime, app } from './services/firebase';
-import { normalizarAtividade, parseDataBRTimestamp } from './utils/rankingPdfParser';
+import { normalizarAtividade, parseDataBRTimestamp, matchActivity, isMovimentacaoUma } from './utils/rankingPdfParser';
 import { obterTurnoColaborador, salvarTurnoCustomizado } from './utils/turnos';
 
 function formatarFrasePeriodo(label: string | null | undefined, operators: OperatorSummary[]): string {
@@ -149,25 +149,11 @@ export default function App() {
     }
 
     // 2. Filtro por Atividade
-    if (selectedActivity && selectedActivity !== 'TODAS AS ATIVIDADES') {
-      const targetNorm = normalizarAtividade(selectedActivity);
-
+    if (selectedActivity && selectedActivity !== 'TODAS AS ATIVIDADES' && !isMovimentacaoUma(selectedActivity)) {
       list = list
         .map((colab) => {
           if (colab.registrosDetalhados && colab.registrosDetalhados.length > 0) {
-            const matching = colab.registrosDetalhados.filter((r) => {
-              const regNorm = normalizarAtividade(r.atividade);
-              if (regNorm === targetNorm) return true;
-              if (regNorm.includes(targetNorm) || targetNorm.includes(regNorm)) return true;
-              if (targetNorm.includes('CONF VOLUME') && (regNorm.includes('VOLUME') || regNorm.includes('VOL'))) return true;
-              if (targetNorm.includes('CONF CARREG') && (regNorm.includes('CARREG') || regNorm.includes('CARGA'))) return true;
-              if (targetNorm.includes('CONF RECEB') && (regNorm.includes('RECEB') || regNorm.includes('REC'))) return true;
-              if (targetNorm.includes('MOV EXP') && (regNorm.includes('MOV') && regNorm.includes('EXP'))) return true;
-              if (targetNorm.includes('APANHA') && (regNorm.includes('APANHA') || regNorm.includes('SEPAR') || regNorm.includes('PICK'))) return true;
-              if (targetNorm.includes('GOODS ISSUE') && (regNorm.includes('GOODS') || regNorm.includes('ISSUE') || regNorm.includes('BAIXA'))) return true;
-              if (targetNorm.includes('MOVIMENTACAO') && regNorm.includes('MOV')) return true;
-              return false;
-            });
+            const matching = colab.registrosDetalhados.filter((r) => matchActivity(r.atividade, selectedActivity));
 
             const sumOrdens = matching.reduce((t, r) => t + r.qtdOrdens, 0);
             const sumServ = matching.reduce((t, r) => t + r.qtdServ, 0);
@@ -412,6 +398,8 @@ export default function App() {
                       <LayerResumoGeral
                         variant="right"
                         kpis={currentKPIs}
+                        operators={rawActiveOperators}
+                        selectedActivity={selectedActivity}
                         onFilterActivity={setSelectedActivity}
                       />
                     </div>

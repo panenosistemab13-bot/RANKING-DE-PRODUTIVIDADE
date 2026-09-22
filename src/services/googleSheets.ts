@@ -175,8 +175,8 @@ export async function importarRankingDeSheets(
         participation: 0,
         trendGrowth: +(Math.random() * 8 + 2).toFixed(1),
         sparkline: [prod * 0.7, prod * 0.8, prod * 0.75, prod * 0.85, prod * 0.9, prod],
-        topActivity: 'MOVIMENTAÇÃO UMA',
-        activitiesCount: { 'MOVIMENTAÇÃO UMA': prod }
+        topActivity: 'MOVIMENTAÇÃO',
+        activitiesCount: { 'MOVIMENTAÇÃO': prod }
       };
     });
 
