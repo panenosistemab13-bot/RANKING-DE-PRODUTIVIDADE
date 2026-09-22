@@ -1,152 +1,145 @@
-import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged, User } from 'firebase/auth';
 import { ref, get, set } from 'firebase/database';
-import { app, rtdb } from './firebase';
+import { rtdb } from './firebase';
 
-export const auth = getAuth(app);
-const provider = new GoogleAuthProvider();
+export interface AutorizedUser {
+  email: string;
+  name: string;
+  password?: string;
+}
 
-// Adiciona os escopos necessários
-provider.addScope('https://www.googleapis.com/auth/userinfo.email');
-provider.addScope('https://www.googleapis.com/auth/userinfo.profile');
-provider.addScope('openid');
-provider.addScope('https://www.googleapis.com/auth/spreadsheets');
+// Lista padrão de usuários iniciais caso o banco esteja vazio
+const DEFAULT_AUTHORIZED_USERS: Record<string, AutorizedUser> = {
+  "admin": {
+    "email": "panenosistemab13@gmail.com",
+    "name": "Administrador SAGA",
+    "password": "trescafe2029"
+  },
+  "operacoes": {
+    "email": "operacoes@3coracoes.com.br",
+    "name": "Operações SAGA",
+    "password": "trescafe2029"
+  }
+};
 
-// Lista padrão de emails de fallback/inicialização
-const HARDCODED_ALLOWED_EMAILS = [
-  'panenosistemab13@gmail.com'
-];
+let cachedUserEmail: string | null = null;
+let cachedUserName: string | null = null;
 
-let cachedAccessToken: string | null = null;
-let isSigningIn = false;
+// Callbacks do listener
+let authSuccessListener: ((user: { email: string; displayName?: string }, token: string) => void) | null = null;
+let authFailureListener: (() => void) | null = null;
 
 /**
- * Obtém a lista de e-mails autorizados do Firebase Realtime Database
+ * Inicializa a lista de usuários no banco de dados se estiver vazia
  */
-export const obterEmailsPermitidos = async (): Promise<string[]> => {
+export const garantirUsuariosIniciais = async () => {
   try {
-    const dbRef = ref(rtdb, 'emails_permitidos');
+    const dbRef = ref(rtdb, 'usuarios_autorizados');
     const snapshot = await get(dbRef);
-    if (snapshot.exists()) {
-      const data = snapshot.val();
-      if (Array.isArray(data)) {
-        return data.filter(Boolean).map(email => String(email).trim().toLowerCase());
-      } else if (typeof data === 'object') {
-        return Object.values(data).filter(Boolean).map(email => String(email).trim().toLowerCase());
-      }
+    if (!snapshot.exists()) {
+      await set(dbRef, DEFAULT_AUTHORIZED_USERS);
+      console.log('[Auth] Usuários padrão de inicialização criados no Firebase!');
     }
-    
-    // Se não existir, inicializa a lista no Firebase com o administrador padrão
-    await set(dbRef, HARDCODED_ALLOWED_EMAILS);
-    return HARDCODED_ALLOWED_EMAILS.map(email => email.toLowerCase());
   } catch (err) {
-    console.warn('[Google Auth] Erro ao carregar emails_permitidos, usando fallback:', err);
-    return HARDCODED_ALLOWED_EMAILS.map(email => email.toLowerCase());
+    console.error('[Auth] Erro ao garantir usuários iniciais:', err);
   }
 };
 
 /**
- * Inicializa o listener de estado de autenticação com validação estrita de lista
+ * Inicializa o listener de autenticação simulada baseada em credenciais salvas no SessionStorage/LocalStorage
  */
 export const initAuth = (
-  onAuthSuccess?: (user: User, token: string) => void,
+  onAuthSuccess?: (user: { email: string; displayName?: string }, token: string) => void,
   onAuthFailure?: () => void
 ) => {
-  return onAuthStateChanged(auth, async (user: User | null) => {
-    if (user) {
-      try {
-        const email = user.email?.trim().toLowerCase();
-        const permitidos = await obterEmailsPermitidos();
-        
-        if (!email || !permitidos.includes(email)) {
-          console.warn(`[Google Auth] Tentativa de login negada: o e-mail ${user.email} não está autorizado.`);
-          await signOut(auth);
-          cachedAccessToken = null;
-          sessionStorage.removeItem('saga_oauth_access_token');
-          if (onAuthFailure) onAuthFailure();
-          return;
-        }
+  authSuccessListener = onAuthSuccess || null;
+  authFailureListener = onAuthFailure || null;
 
-        const savedToken = sessionStorage.getItem('saga_oauth_access_token');
-        if (savedToken) {
-          cachedAccessToken = savedToken;
-        }
-        
-        if (cachedAccessToken) {
-          if (onAuthSuccess) onAuthSuccess(user, cachedAccessToken);
-        } else if (!isSigningIn) {
-          cachedAccessToken = null;
-          if (onAuthFailure) onAuthFailure();
-        }
-      } catch (err) {
-        await signOut(auth);
-        cachedAccessToken = null;
-        sessionStorage.removeItem('saga_oauth_access_token');
-        if (onAuthFailure) onAuthFailure();
-      }
-    } else {
-      cachedAccessToken = null;
-      sessionStorage.removeItem('saga_oauth_access_token');
-      if (onAuthFailure) onAuthFailure();
+  // Garante a criação inicial dos usuários de forma assíncrona
+  garantirUsuariosIniciais();
+
+  // Verifica se há credenciais salvas no localStorage
+  const savedEmail = localStorage.getItem('saga_logged_user_email');
+  const savedName = localStorage.getItem('saga_logged_user_name');
+  
+  if (savedEmail && savedName) {
+    cachedUserEmail = savedEmail;
+    cachedUserName = savedName;
+    if (onAuthSuccess) {
+      onAuthSuccess({ email: savedEmail, displayName: savedName }, 'local-auth-token-saga');
     }
-  });
+  } else {
+    if (onAuthFailure) onAuthFailure();
+  }
+
+  // Retorna uma função de unsubscribe fictícia
+  return () => {
+    authSuccessListener = null;
+    authFailureListener = null;
+  };
 };
 
 /**
- * Realiza o login com o popup do Google e valida o e-mail contra a lista permitida
+ * Valida as credenciais digitadas contra as cadastradas no Firebase Realtime Database
  */
-export const googleSignIn = async (): Promise<{ user: User; accessToken: string } | null> => {
+export const realizarLoginComCredenciais = async (emailInput: string, passwordInput: string): Promise<{ email: string; name: string }> => {
+  await garantirUsuariosIniciais();
+  
+  const emailLower = emailInput.trim().toLowerCase();
+  const password = passwordInput.trim();
+
   try {
-    isSigningIn = true;
+    const dbRef = ref(rtdb, 'usuarios_autorizados');
+    const snapshot = await get(dbRef);
     
-    provider.setCustomParameters({
-      prompt: 'select_account'
-    });
+    if (snapshot.exists()) {
+      const usersData = snapshot.val();
+      const usersList: AutorizedUser[] = Object.values(usersData);
+      
+      const matchedUser = usersList.find(
+        (u) => u.email.trim().toLowerCase() === emailLower && u.password === password
+      );
 
-    const result = await signInWithPopup(auth, provider);
-    const user = result.user;
-    const email = user.email?.trim().toLowerCase();
-    
-    // Validação estrita da lista de emails
-    const permitidos = await obterEmailsPermitidos();
-    if (!email || !permitidos.includes(email)) {
-      await signOut(auth);
-      cachedAccessToken = null;
-      sessionStorage.removeItem('saga_oauth_access_token');
-      throw new Error(`Acesso Negado: O e-mail "${user.email}" não está autorizado na lista de administradores do SAGA WMS.`);
+      if (matchedUser) {
+        cachedUserEmail = matchedUser.email;
+        cachedUserName = matchedUser.name;
+        
+        localStorage.setItem('saga_logged_user_email', matchedUser.email);
+        localStorage.setItem('saga_logged_user_name', matchedUser.name);
+        sessionStorage.setItem('saga_oauth_access_token', 'local-auth-token-saga');
+
+        if (authSuccessListener) {
+          authSuccessListener({ email: matchedUser.email, displayName: matchedUser.name }, 'local-auth-token-saga');
+        }
+        
+        return { email: matchedUser.email, name: matchedUser.name };
+      }
     }
-
-    const credential = GoogleAuthProvider.credentialFromResult(result);
-    if (!credential?.accessToken) {
-      throw new Error('Não foi possível obter o token de acesso do Google.');
-    }
-
-    cachedAccessToken = credential.accessToken;
-    sessionStorage.setItem('saga_oauth_access_token', cachedAccessToken);
     
-    return { user, accessToken: cachedAccessToken };
-  } catch (error: any) {
-    console.error('Erro ao autenticar com o Google:', error);
-    throw error;
-  } finally {
-    isSigningIn = false;
+    throw new Error('E-mail ou senha incorretos. Por favor, verifique suas credenciais de acesso.');
+  } catch (err: any) {
+    console.error('[Auth] Erro ao validar credenciais:', err);
+    throw err;
   }
 };
 
 /**
- * Obtém o token de acesso em cache
+ * Mantemos a assinatura googleSignIn para compatibilidade de fluxo no frontend
+ */
+export const googleSignIn = async (): Promise<any> => {
+  throw new Error('Google OAuth desativado. Por favor, utilize o login por e-mail e senha.');
+};
+
+/**
+ * Obtém o token de acesso em cache (fictício para satisfazer o googleSheets)
  */
 export const getAccessToken = async (): Promise<string | null> => {
-  if (!cachedAccessToken) {
-    cachedAccessToken = sessionStorage.getItem('saga_oauth_access_token');
-  }
-  return cachedAccessToken;
+  return sessionStorage.getItem('saga_oauth_access_token');
 };
 
 /**
  * Define o token de acesso manualmente
  */
 export const setAccessToken = (token: string | null) => {
-  cachedAccessToken = token;
   if (token) {
     sessionStorage.setItem('saga_oauth_access_token', token);
   } else {
@@ -158,7 +151,10 @@ export const setAccessToken = (token: string | null) => {
  * Realiza o logout (Sign out)
  */
 export const logoutGoogle = async () => {
-  await signOut(auth);
-  cachedAccessToken = null;
+  cachedUserEmail = null;
+  cachedUserName = null;
+  localStorage.removeItem('saga_logged_user_email');
+  localStorage.removeItem('saga_logged_user_name');
   sessionStorage.removeItem('saga_oauth_access_token');
+  if (authFailureListener) authFailureListener();
 };

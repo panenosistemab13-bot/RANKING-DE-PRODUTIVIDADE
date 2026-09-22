@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Shield, MapPin, BarChart2, Target, ArrowRight, ShieldAlert } from 'lucide-react';
+import { Shield, MapPin, BarChart2, Target, ArrowRight, ShieldAlert, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import bgImage from '../assets/images/saga_login_bg_1790075329836.jpg';
-import { googleSignIn } from '../services/googleAuth';
+import { realizarLoginComCredenciais } from '../services/googleAuth';
 
 interface LoginScreenProps {
   onLogin: (email: string) => void;
@@ -13,21 +13,26 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   defaultEmail = 'panenosistemab13@gmail.com'
 }) => {
   const [loading, setLoading] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const handleGoogleLogin = async () => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim() || !password.trim()) {
+      setErrorMsg('Por favor, preencha todos os campos.');
+      return;
+    }
+
     setLoading(true);
     setErrorMsg(null);
     try {
-      const result = await googleSignIn();
-      if (result && result.user && result.user.email) {
-        onLogin(result.user.email);
-      } else {
-        throw new Error('E-mail não retornado pela conta Google.');
-      }
+      const user = await realizarLoginComCredenciais(email, password);
+      onLogin(user.email);
     } catch (err: any) {
       console.error('Erro de login:', err);
-      setErrorMsg(err.message || 'Erro de autenticação Google. Tente novamente.');
+      setErrorMsg(err.message || 'Credenciais inválidas. Tente novamente.');
     } finally {
       setLoading(false);
     }
@@ -103,11 +108,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       </div>
 
       {/* 4. CENTRAL GLASSMORPHISM CARD */}
-      <div className="relative z-30 w-full max-w-[480px] mx-4 transform scale-90 sm:scale-95 md:scale-100 transition-transform">
+      <div className="relative z-30 w-full max-w-[450px] mx-4 transform scale-90 sm:scale-95 md:scale-100 transition-transform">
         {/* Golden Reflection Below Card onto Pavement */}
         <div className="absolute -bottom-10 left-1/2 -translate-x-1/2 w-4/5 h-20 bg-amber-500/30 blur-2xl rounded-full pointer-events-none" />
 
-        <div className="w-full rounded-[28px] bg-[#061329]/85 backdrop-blur-2xl border border-[#1c3866] p-6 md:p-8 relative text-center text-white shadow-[0_25px_60px_rgba(0,0,0,0.9),0_0_50px_rgba(0,168,255,0.22)] overflow-visible">
+        <div className="w-full rounded-[28px] bg-[#061329]/90 backdrop-blur-2xl border border-[#1c3866] p-6 md:p-8 relative text-center text-white shadow-[0_25px_60px_rgba(0,0,0,0.9),0_0_50px_rgba(0,168,255,0.22)] overflow-visible">
           {/* Cyan/Blue Inner Contour Glow */}
           <div className="absolute inset-0 rounded-[28px] border border-cyan-400/30 pointer-events-none shadow-[inset_0_0_20px_rgba(0,168,255,0.2)]" />
 
@@ -132,49 +137,83 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
           </div>
 
           {/* 7. SUBTITLE */}
-          <p className="text-slate-300/90 text-xs md:text-sm font-normal leading-relaxed max-w-[400px] mx-auto mb-6 font-sans">
-            Faça login com sua conta Google autorizada para acessar<br className="hidden sm:inline" />
-            o painel de produtividade em tempo real.
+          <p className="text-slate-300/90 text-xs md:text-sm font-normal leading-relaxed max-w-[360px] mx-auto mb-6 font-sans">
+            Acesse o painel SAGA WMS de produtividade 3 Corações com seu e-mail e senha cadastrados.
           </p>
 
           {errorMsg && (
-            <div className="w-full max-w-[400px] mx-auto mb-5 p-3 rounded-2xl bg-red-500/15 border border-red-500/30 text-xs text-red-200 flex items-center gap-2 text-left">
+            <div className="w-full max-w-[400px] mx-auto mb-5 p-3 rounded-2xl bg-red-500/15 border border-red-500/30 text-xs text-red-200 flex items-center gap-2 text-left animate-shake">
               <ShieldAlert className="w-4 h-4 text-red-400 shrink-0" />
               <span>{errorMsg}</span>
             </div>
           )}
 
-          {/* 8. GOOGLE LOGIN BUTTON */}
-          <button
-            onClick={handleGoogleLogin}
-            disabled={loading}
-            className="w-full max-w-[400px] mx-auto py-3 px-5 rounded-full bg-[#081830]/90 hover:bg-[#0c2244] border-2 border-[#00a8ff] shadow-[0_0_25px_rgba(0,168,255,0.7),inset_0_0_12px_rgba(0,168,255,0.35)] hover:shadow-[0_0_35px_rgba(0,168,255,0.95),inset_0_0_20px_rgba(0,168,255,0.5)] transition-all duration-300 cursor-pointer flex items-center justify-between group relative overflow-hidden active:scale-98"
-          >
-            {/* Left Google Official Colored G Icon */}
-            <div className="w-7 h-7 rounded-full bg-white flex items-center justify-center shrink-0 shadow-md">
-              <svg viewBox="0 0 24 24" className="w-4 h-4">
-                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
-                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
-              </svg>
+          {/* 8. CREDENTIALS FORM */}
+          <form onSubmit={handleSubmit} className="w-full max-w-[380px] mx-auto space-y-4 text-left">
+            {/* Campo E-mail */}
+            <div className="space-y-1.5">
+              <label className="block text-[10px] font-black text-slate-300 uppercase tracking-wider">
+                E-mail Corporativo
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#00a8ff]">
+                  <Mail className="w-4 h-4" />
+                </div>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="exemplo@3coracoes.com.br"
+                  required
+                  className="w-full h-11 pl-10 pr-4 bg-[#051125]/90 border border-[#1b345a] rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#00a8ff] focus:ring-1 focus:ring-[#00a8ff] transition-all"
+                />
+              </div>
             </div>
 
-            {/* Center Label */}
-            <span className="text-white font-semibold text-sm md:text-base tracking-wide font-sans text-center flex-1 px-2">
-              {loading ? 'Autenticando...' : 'Entrar com Conta Google'}
-            </span>
-
-            {/* Right Glowing Arrow Circle */}
-            <div className="w-7 h-7 rounded-full border border-cyan-400/60 bg-cyan-500/20 flex items-center justify-center text-cyan-300 group-hover:bg-cyan-500 group-hover:text-slate-950 transition-all shrink-0">
-              <ArrowRight className="w-3.5 h-3.5 stroke-[2.5]" />
+            {/* Campo Senha */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="block text-[10px] font-black text-slate-300 uppercase tracking-wider">
+                  Senha de Acesso
+                </label>
+              </div>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#00a8ff]">
+                  <Lock className="w-4 h-4" />
+                </div>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Digite sua senha..."
+                  required
+                  className="w-full h-11 pl-10 pr-10 bg-[#051125]/90 border border-[#1b345a] rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#00a8ff] focus:ring-1 focus:ring-[#00a8ff] transition-all"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
-          </button>
+
+            {/* Botão Entrar */}
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full h-11 mt-2.5 rounded-full bg-gradient-to-r from-amber-500 via-amber-600 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 transition-all hover:scale-[1.01] active:scale-[0.98] cursor-pointer"
+            >
+              <span>{loading ? 'AUTENTICANDO...' : 'ENTRAR NO SISTEMA SAGA'}</span>
+              <ArrowRight className="w-4 h-4 stroke-[2.5]" />
+            </button>
+          </form>
 
           {/* 9. FOOTER UNDER BUTTON */}
-          <div className="mt-6 text-[10px] font-black text-slate-300/80 uppercase tracking-[0.25em] flex items-center justify-center gap-1.5">
+          <div className="mt-6 text-[10px] font-black text-slate-300/80 uppercase tracking-[0.25em] flex items-center justify-center gap-1.5 select-none">
             <Shield className="w-3 h-3 text-cyan-400 fill-cyan-400/20" />
-            <span>SEGURO  •  RÁPIDO  •  CONFIÁVEL</span>
+            <span>SISTEMA PROTEGIDO • SAGA WMS</span>
           </div>
         </div>
       </div>
