@@ -69,7 +69,7 @@ export async function exportarRankingParaSheets(
   const values = [headers, ...valueRows];
 
   // 3. Escreve os dados na planilha (A1:L...)
-  const updateRange = `Sheet1!A1:L${values.length}`;
+  const updateRange = `PRODUTIVIDADE!A1:L${values.length}`;
   const updateResponse = await fetch(
     `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${updateRange}?valueInputOption=USER_ENTERED`,
     {
@@ -97,7 +97,7 @@ export async function exportarRankingParaSheets(
  */
 export async function importarRankingDeSheets(
   spreadsheetId: string,
-  rangeName = 'Sheet1!A:Z'
+  rangeName = 'PRODUTIVIDADE!A:Z'
 ): Promise<OperatorSummary[]> {
   const token = await getAccessToken();
   if (!token) {
