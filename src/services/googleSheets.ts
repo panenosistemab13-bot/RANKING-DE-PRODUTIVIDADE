@@ -96,303 +96,291 @@ export async function exportarRankingParaSheets(
 export const FIXED_SPREADSHEET_ID = '1synVKAYxOm4dRUXEuw65u0Lv1erLF7-9PXeAUtSd-QA';
 
 /**
- * Script Apps Script oficial para copiar e colar no Google Sheets (Extensões > Apps Script)
+ * Script Apps Script oficial (Web App) para copiar e colar no Google Sheets (Extensões > Apps Script)
+ * Não utiliza Firebase. Expõe os dados em JSON via Web App (doGet).
  */
 export const OFFICIAL_GOOGLE_APPS_SCRIPT = `/**
  * ============================================================================
- * SAGA WMS • 3 CORAÇÕES - SCRIPT DE SINCRONIZAÇÃO EM TEMPO REAL
+ * SAGA WMS • 3 CORAÇÕES - SCRIPT WEB APP (SEM FIREBASE)
  * ============================================================================
- * Regra de Negócio:
- * - Localiza dinamicamente o cabeçalho correto e a coluna de Colaborador/Funcionário.
- * - Filtra estritamente datas/timestamps GMT para garantir apenas nomes de colaboradores válidos.
- * - O ranking é contabilizado pelo número de UMA DESTINO única por usuário (1 ponto por UMA DESTINO).
- * - Se a mesma UMA DESTINO se repete para o MESMO usuário, é contabilizada apenas 1 vez.
- * - Se a mesma UMA DESTINO pertencer a OUTRO usuário, contabiliza 1 ponto para o outro usuário.
- * - Todas as atividades reais da coluna ATIVIDADE são extraídas e enviadas para o filtro do app.
+ * Como usar no Google Sheets:
+ * 1. Na sua planilha do Google Sheets, acesse:
+ *    Extensões > Apps Script
+ * 2. Cole este código completo substituindo todo o conteúdo atual.
+ * 3. Clique em Salvar (💾).
+ * 4. Clique no botão azul "Implantar" (Deploy) > "Nova implantação" (New deployment).
+ * 5. Clique na engrenagem ⚙️ e selecione "App da Web" (Web app).
+ * 6. Configurações da Implantação:
+ *    - Descrição: SAGA WMS Web App
+ *    - Executar como: Eu (Sua conta Google)
+ *    - Quem pode acessar: Qualquer pessoa (Anyone)
+ * 7. Clique em "Implantar", autorize o acesso se solicitado e COPIE A URL DO WEB APP.
+ * 8. Cole a URL do Web App no SAGA WMS para sincronização automática!
+ * ============================================================================
  */
 
-const FIREBASE_RTDB_URL = "https://ranking-produtividade-default-rtdb.firebaseio.com/ranking_atual.json";
+function doGet(e) {
+  try {
+    var payload = processarDadosPlanilha();
+    return ContentService.createTextOutput(JSON.stringify(payload))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    var errorOutput = {
+      error: true,
+      message: "Erro ao processar planilha: " + err.toString(),
+      operators: []
+    };
+    return ContentService.createTextOutput(JSON.stringify(errorOutput))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function processarDadosPlanilha() {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  var data = sheet.getDataRange().getValues();
+
+  if (!data || data.length < 2) {
+    return {
+      operators: [],
+      label: "PLANILHA VAZIA • " + sheet.getName(),
+      updatedAt: new Date().toISOString(),
+      totalOperators: 0,
+      totalProductivity: 0,
+      totalMovements: 0
+    };
+  }
+
+  // 1. Localiza dinamicamente a linha de cabeçalho (varre as primeiras 10 linhas)
+  var headerRowIndex = 0;
+  var idxFunc = -1;
+  var idxUmaDestino = -1;
+  var idxUmaOrigem = -1;
+  var idxAtividade = -1;
+  var idxTurno = -1;
+
+  for (var r = 0; r < Math.min(data.length, 10); r++) {
+    var rowHeaders = [];
+    for (var h = 0; h < data[r].length; h++) {
+      rowHeaders.push(String(data[r][h] || '').toUpperCase().trim());
+    }
+
+    var tempFunc = -1;
+    var tempUmaDest = -1;
+    var tempUmaOrig = -1;
+    var tempAtiv = -1;
+    var tempTurno = -1;
+
+    for (var c = 0; c < rowHeaders.length; c++) {
+      var hName = rowHeaders[c];
+      if (!hName) continue;
+
+      if (tempFunc === -1 && (
+        hName.indexOf('FUNCIONARIO') !== -1 || hName.indexOf('FUNCIONÁRIO') !== -1 ||
+        hName.indexOf('COLABORADOR') !== -1 || hName.indexOf('OPERADOR') !== -1 ||
+        hName.indexOf('USUARIO') !== -1 || hName.indexOf('USUÁRIO') !== -1 ||
+        hName.indexOf('MATRICULA') !== -1 || hName.indexOf('MATRÍCULA') !== -1 ||
+        (hName.indexOf('NOME') !== -1 && hName.indexOf('PRODUTO') === -1 && hName.indexOf('ATIVIDADE') === -1 && hName.indexOf('DEPOSITO') === -1)
+      )) {
+        tempFunc = c;
+      }
+
+      if (tempUmaDest === -1 && (
+        hName.indexOf('UMA DESTINO') !== -1 || hName.indexOf('UMA_DESTINO') !== -1 ||
+        hName.indexOf('ENDERECO DESTINO') !== -1 || hName.indexOf('ENDEREÇO DESTINO') !== -1 ||
+        (hName.indexOf('DESTINO') !== -1 && hName.indexOf('DEPOSITO') === -1)
+      )) {
+        tempUmaDest = c;
+      }
+
+      if (tempUmaOrig === -1 && (
+        hName.indexOf('UMA ORIGEM') !== -1 || hName.indexOf('UMA_ORIGEM') !== -1 ||
+        hName.indexOf('ENDERECO ORIGEM') !== -1 || hName.indexOf('ENDEREÇO ORIGEM') !== -1 ||
+        hName.indexOf('ORIGEM') !== -1
+      )) {
+        tempUmaOrig = c;
+      }
+
+      if (tempAtiv === -1 && (
+        hName.indexOf('ATIVIDADE') !== -1 || hName.indexOf('SERVICO') !== -1 ||
+        hName.indexOf('SERVIÇO') !== -1 || hName.indexOf('TAREFA') !== -1 ||
+        hName.indexOf('OPERAÇÃO') !== -1 || hName.indexOf('OPERACAO') !== -1
+      )) {
+        tempAtiv = c;
+      }
+
+      if (tempTurno === -1 && (hName.indexOf('TURNO') !== -1 || hName.indexOf('EQUIPE') !== -1)) {
+        tempTurno = c;
+      }
+    }
+
+    if (tempFunc !== -1 || tempUmaDest !== -1 || tempAtiv !== -1) {
+      headerRowIndex = r;
+      idxFunc = tempFunc;
+      idxUmaDestino = tempUmaDest;
+      idxUmaOrigem = tempUmaOrig;
+      idxAtividade = tempAtiv;
+      idxTurno = tempTurno;
+      break;
+    }
+  }
+
+  // Fallback de segurança se a coluna do funcionário não foi encontrada por nome
+  if (idxFunc === -1) {
+    for (var col = 0; col < (data[0] ? data[0].length : 0); col++) {
+      var sampleVal = String(data[headerRowIndex + 1] ? data[headerRowIndex + 1][col] : '').trim();
+      if (sampleVal && sampleVal.indexOf('GMT') === -1 && !/^\d{2}\/\d{2}/.test(sampleVal) && isNaN(Number(sampleVal))) {
+        idxFunc = col;
+        break;
+      }
+    }
+    if (idxFunc === -1) idxFunc = 0;
+  }
+
+  var idxUma = idxUmaDestino !== -1 ? idxUmaDestino : (idxUmaOrigem !== -1 ? idxUmaOrigem : 1);
+  var rankingMap = {};
+
+  for (var i = headerRowIndex + 1; i < data.length; i++) {
+    var row = data[i];
+    if (!row || row.length === 0) continue;
+
+    var rawFunc = row[idxFunc];
+    if (!rawFunc) continue;
+
+    if (rawFunc instanceof Date) continue;
+
+    var func = String(rawFunc).trim().toUpperCase();
+
+    if (
+      !func ||
+      func === 'UNDEFINED' || func === 'NULL' || func === 'TOTAL' || func === 'SUBTOTAL' ||
+      func.indexOf('GMT') !== -1 || func.indexOf('BRT') !== -1 || func.indexOf('UTC') !== -1 ||
+      func.indexOf('2026') !== -1 || func.indexOf('2025') !== -1 || func.indexOf('2024') !== -1 ||
+      /^\d{2}\/\d{2}\/\d{4}/.test(func) || /^\d{4}-\d{2}-\d{2}/.test(func)
+    ) {
+      continue;
+    }
+
+    var rawUma = row[idxUma];
+    var umaDest = (rawUma && !(rawUma instanceof Date)) ? String(rawUma).trim().toUpperCase() : '';
+
+    var rawAtiv = idxAtividade !== -1 ? row[idxAtividade] : null;
+    var atividade = 'MOVIMENTAÇÃO';
+    if (rawAtiv && !(rawAtiv instanceof Date)) {
+      var strAtiv = String(rawAtiv).trim().toUpperCase();
+      if (strAtiv && strAtiv.indexOf('GMT') === -1 && strAtiv.indexOf('2026') === -1) {
+        atividade = strAtiv;
+      }
+    }
+
+    var rawTurno = idxTurno !== -1 ? row[idxTurno] : null;
+    var turno = (rawTurno && !(rawTurno instanceof Date)) ? String(rawTurno).trim().toUpperCase() : 'A';
+
+    if (!rankingMap[func]) {
+      rankingMap[func] = {
+        name: func,
+        turno: turno || 'A',
+        umasObj: {},
+        umasCount: 0,
+        activitiesCount: {},
+        totalRows: 0,
+        registrosDetalhados: []
+      };
+    }
+
+    rankingMap[func].totalRows++;
+
+    // Contabiliza cada UMA DESTINO única por usuário (1 ponto por UMA DESTINO)
+    if (umaDest && umaDest !== '') {
+      if (!rankingMap[func].umasObj[umaDest]) {
+        rankingMap[func].umasObj[umaDest] = true;
+        rankingMap[func].umasCount++;
+      }
+    }
+
+    if (atividade && atividade !== '') {
+      rankingMap[func].activitiesCount[atividade] = (rankingMap[func].activitiesCount[atividade] || 0) + 1;
+    }
+
+    rankingMap[func].registrosDetalhados.push({
+      uma: umaDest || 'N/A',
+      atividade: atividade || 'MOVIMENTAÇÃO',
+      qtdOrdens: 1,
+      qtdServ: 1,
+      qtdPecas: 1,
+      qtdLotes: 1,
+      data: new Date().toLocaleDateString('pt-BR')
+    });
+  }
+
+  var keys = Object.keys(rankingMap);
+  var operators = [];
+  var totalGeral = 0;
+
+  for (var k = 0; k < keys.length; k++) {
+    var name = keys[k];
+    var item = rankingMap[name];
+    var prod = item.umasCount > 0 ? item.umasCount : item.totalRows;
+    totalGeral += prod;
+
+    var topAct = 'MOVIMENTAÇÃO';
+    var maxAct = 0;
+    var actKeys = Object.keys(item.activitiesCount);
+    for (var a = 0; a < actKeys.length; a++) {
+      var actName = actKeys[a];
+      if (item.activitiesCount[actName] > maxAct) {
+        maxAct = item.activitiesCount[actName];
+        topAct = actName;
+      }
+    }
+
+    operators.push({
+      rank: k + 1,
+      name: item.name,
+      turno: item.turno || 'A',
+      totalProductivity: prod,
+      movements: prod,
+      participation: 0,
+      trendGrowth: 5.5,
+      sparkline: [Math.round(prod * 0.7), Math.round(prod * 0.85), prod],
+      topActivity: topAct,
+      activitiesCount: item.activitiesCount,
+      registrosDetalhados: item.registrosDetalhados.slice(0, 200)
+    });
+  }
+
+  operators.sort(function(a, b) {
+    return b.totalProductivity - a.totalProductivity;
+  });
+
+  for (var r = 0; r < operators.length; r++) {
+    operators[r].rank = r + 1;
+  }
+
+  return {
+    operators: operators,
+    label: "PLANILHA GOOGLE SHEETS SAGA • " + sheet.getName(),
+    updatedAt: new Date().toISOString(),
+    totalOperators: operators.length,
+    totalProductivity: totalGeral,
+    totalMovements: totalGeral
+  };
+}
 
 function onOpen() {
   try {
-    const ui = SpreadsheetApp.getUi();
+    var ui = SpreadsheetApp.getUi();
     ui.createMenu('⚡ SAGA WMS')
-      .addItem('🚀 Sincronizar com App SAGA (Agora)', 'sincronizarComAppSaga')
-      .addSeparator()
-      .addItem('⚙️ Agendar Sincronização Automática (A cada hora)', 'agendarSincronizacaoAutomatica')
+      .addItem('🔍 Testar Processamento de Dados', 'testarProcessamento')
       .addToUi();
   } catch (e) {
     Logger.log("Erro no onOpen: " + e.toString());
   }
 }
 
-function sincronizarComAppSaga() {
+function testarProcessamento() {
   var ui = SpreadsheetApp.getUi();
-
-  try {
-    var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-    var data = sheet.getDataRange().getValues();
-
-    if (!data || data.length < 2) {
-      ui.alert('⚠️ A planilha está vazia ou possui apenas o cabeçalho.');
-      return;
-    }
-
-    // 1. Localiza dinamicamente a linha de cabeçalho (varre as primeiras 10 linhas)
-    var headerRowIndex = 0;
-    var idxFunc = -1;
-    var idxUmaDestino = -1;
-    var idxUmaOrigem = -1;
-    var idxAtividade = -1;
-    var idxTurno = -1;
-
-    for (var r = 0; r < Math.min(data.length, 10); r++) {
-      var rowHeaders = [];
-      for (var h = 0; h < data[r].length; h++) {
-        rowHeaders.push(String(data[r][h] || '').toUpperCase().trim());
-      }
-
-      var tempFunc = -1;
-      var tempUmaDest = -1;
-      var tempUmaOrig = -1;
-      var tempAtiv = -1;
-      var tempTurno = -1;
-
-      for (var c = 0; c < rowHeaders.length; c++) {
-        var hName = rowHeaders[c];
-        if (!hName) continue;
-
-        if (tempFunc === -1 && (
-          hName.indexOf('FUNCIONARIO') !== -1 || hName.indexOf('FUNCIONÁRIO') !== -1 ||
-          hName.indexOf('COLABORADOR') !== -1 || hName.indexOf('OPERADOR') !== -1 ||
-          hName.indexOf('USUARIO') !== -1 || hName.indexOf('USUÁRIO') !== -1 ||
-          hName.indexOf('MATRICULA') !== -1 || hName.indexOf('MATRÍCULA') !== -1 ||
-          (hName.indexOf('NOME') !== -1 && hName.indexOf('PRODUTO') === -1 && hName.indexOf('ATIVIDADE') === -1 && hName.indexOf('DEPOSITO') === -1)
-        )) {
-          tempFunc = c;
-        }
-
-        if (tempUmaDest === -1 && (
-          hName.indexOf('UMA DESTINO') !== -1 || hName.indexOf('UMA_DESTINO') !== -1 ||
-          hName.indexOf('ENDERECO DESTINO') !== -1 || hName.indexOf('ENDEREÇO DESTINO') !== -1 ||
-          (hName.indexOf('DESTINO') !== -1 && hName.indexOf('DEPOSITO') === -1)
-        )) {
-          tempUmaDest = c;
-        }
-
-        if (tempUmaOrig === -1 && (
-          hName.indexOf('UMA ORIGEM') !== -1 || hName.indexOf('UMA_ORIGEM') !== -1 ||
-          hName.indexOf('ENDERECO ORIGEM') !== -1 || hName.indexOf('ENDEREÇO ORIGEM') !== -1 ||
-          hName.indexOf('ORIGEM') !== -1
-        )) {
-          tempUmaOrig = c;
-        }
-
-        if (tempAtiv === -1 && (
-          hName.indexOf('ATIVIDADE') !== -1 || hName.indexOf('SERVICO') !== -1 ||
-          hName.indexOf('SERVIÇO') !== -1 || hName.indexOf('TAREFA') !== -1 ||
-          hName.indexOf('OPERAÇÃO') !== -1 || hName.indexOf('OPERACAO') !== -1
-        )) {
-          tempAtiv = c;
-        }
-
-        if (tempTurno === -1 && (hName.indexOf('TURNO') !== -1 || hName.indexOf('EQUIPE') !== -1)) {
-          tempTurno = c;
-        }
-      }
-
-      if (tempFunc !== -1 || tempUmaDest !== -1 || tempAtiv !== -1) {
-        headerRowIndex = r;
-        idxFunc = tempFunc;
-        idxUmaDestino = tempUmaDest;
-        idxUmaOrigem = tempUmaOrig;
-        idxAtividade = tempAtiv;
-        idxTurno = tempTurno;
-        break;
-      }
-    }
-
-    // Fallback de segurança se a coluna do funcionário não foi encontrada por nome
-    if (idxFunc === -1) {
-      // Procura nas linhas de dados a coluna que contém nomes reais (texto sem data)
-      for (var col = 0; col < (data[0] ? data[0].length : 0); col++) {
-        var sampleVal = String(data[headerRowIndex + 1] ? data[headerRowIndex + 1][col] : '').trim();
-        if (sampleVal && sampleVal.indexOf('GMT') === -1 && !/^\d{2}\/\d{2}/.test(sampleVal) && isNaN(Number(sampleVal))) {
-          idxFunc = col;
-          break;
-        }
-      }
-      if (idxFunc === -1) idxFunc = 0;
-    }
-
-    var idxUma = idxUmaDestino !== -1 ? idxUmaDestino : (idxUmaOrigem !== -1 ? idxUmaOrigem : 1);
-
-    var rankingMap = {};
-
-    for (var i = headerRowIndex + 1; i < data.length; i++) {
-      var row = data[i];
-      if (!row || row.length === 0) continue;
-
-      var rawFunc = row[idxFunc];
-      if (!rawFunc) continue;
-
-      // Validação estrita contra datas e timestamps
-      if (rawFunc instanceof Date) continue;
-
-      var func = String(rawFunc).trim().toUpperCase();
-
-      if (
-        !func ||
-        func === 'UNDEFINED' || func === 'NULL' || func === 'TOTAL' || func === 'SUBTOTAL' ||
-        func.indexOf('GMT') !== -1 || func.indexOf('BRT') !== -1 || func.indexOf('UTC') !== -1 ||
-        func.indexOf('2026') !== -1 || func.indexOf('2025') !== -1 || func.indexOf('2024') !== -1 ||
-        /^\d{2}\/\d{2}\/\d{4}/.test(func) || /^\d{4}-\d{2}-\d{2}/.test(func)
-      ) {
-        continue;
-      }
-
-      var rawUma = row[idxUma];
-      var umaDest = (rawUma && !(rawUma instanceof Date)) ? String(rawUma).trim().toUpperCase() : '';
-
-      var rawAtiv = idxAtividade !== -1 ? row[idxAtividade] : null;
-      var atividade = 'MOVIMENTAÇÃO';
-      if (rawAtiv && !(rawAtiv instanceof Date)) {
-        var strAtiv = String(rawAtiv).trim().toUpperCase();
-        if (strAtiv && strAtiv.indexOf('GMT') === -1 && strAtiv.indexOf('2026') === -1) {
-          atividade = strAtiv;
-        }
-      }
-
-      var rawTurno = idxTurno !== -1 ? row[idxTurno] : null;
-      var turno = (rawTurno && !(rawTurno instanceof Date)) ? String(rawTurno).trim().toUpperCase() : 'A';
-
-      if (!rankingMap[func]) {
-        rankingMap[func] = {
-          name: func,
-          turno: turno || 'A',
-          umasObj: {},
-          umasCount: 0,
-          activitiesCount: {},
-          totalRows: 0,
-          registrosDetalhados: []
-        };
-      }
-
-      rankingMap[func].totalRows++;
-
-      // Contabiliza cada UMA DESTINO única por usuário (1 ponto por UMA DESTINO)
-      if (umaDest && umaDest !== '') {
-        if (!rankingMap[func].umasObj[umaDest]) {
-          rankingMap[func].umasObj[umaDest] = true;
-          rankingMap[func].umasCount++;
-        }
-      }
-
-      if (atividade && atividade !== '') {
-        rankingMap[func].activitiesCount[atividade] = (rankingMap[func].activitiesCount[atividade] || 0) + 1;
-      }
-
-      rankingMap[func].registrosDetalhados.push({
-        uma: umaDest || 'N/A',
-        atividade: atividade || 'MOVIMENTAÇÃO',
-        qtdOrdens: 1,
-        qtdServ: 1,
-        qtdPecas: 1,
-        qtdLotes: 1,
-        data: new Date().toLocaleDateString('pt-BR')
-      });
-    }
-
-    var keys = Object.keys(rankingMap);
-    if (keys.length === 0) {
-      ui.alert('⚠️ Nenhum colaborador válido encontrado na planilha.\nVerifique se a coluna de NOME/FUNCIONÁRIO está preenchida corretamente.');
-      return;
-    }
-
-    var operators = [];
-    var totalGeral = 0;
-
-    for (var k = 0; k < keys.length; k++) {
-      var name = keys[k];
-      var item = rankingMap[name];
-      var prod = item.umasCount > 0 ? item.umasCount : item.totalRows;
-      totalGeral += prod;
-
-      var topAct = 'MOVIMENTAÇÃO';
-      var maxAct = 0;
-      var actKeys = Object.keys(item.activitiesCount);
-      for (var a = 0; a < actKeys.length; a++) {
-        var actName = actKeys[a];
-        if (item.activitiesCount[actName] > maxAct) {
-          maxAct = item.activitiesCount[actName];
-          topAct = actName;
-        }
-      }
-
-      operators.push({
-        rank: k + 1,
-        name: item.name,
-        turno: item.turno || 'A',
-        totalProductivity: prod,
-        movements: prod,
-        participation: 0,
-        trendGrowth: 5.5,
-        sparkline: [Math.round(prod * 0.7), Math.round(prod * 0.85), prod],
-        topActivity: topAct,
-        activitiesCount: item.activitiesCount,
-        registrosDetalhados: item.registrosDetalhados.slice(0, 200)
-      });
-    }
-
-    operators.sort(function(a, b) {
-      return b.totalProductivity - a.totalProductivity;
-    });
-
-    for (var r = 0; r < operators.length; r++) {
-      operators[r].rank = r + 1;
-    }
-
-    var payload = {
-      operators: operators,
-      label: "PLANILHA GOOGLE SHEETS SAGA • " + sheet.getName(),
-      updatedAt: new Date().toISOString(),
-      totalOperators: operators.length,
-      totalProductivity: totalGeral,
-      totalMovements: totalGeral
-    };
-
-    var options = {
-      method: 'put',
-      contentType: 'application/json',
-      payload: JSON.stringify(payload),
-      muteHttpExceptions: true
-    };
-
-    var response = UrlFetchApp.fetch(FIREBASE_RTDB_URL, options);
-    var code = response.getResponseCode();
-
-    if (code === 200) {
-      ui.alert('✅ SUCESSO!\n\n' + operators.length + ' colaboradores válidos sincronizados com sucesso!\n\nRanking contabilizado por UMA DESTINO única por usuário.');
-    } else {
-      ui.alert('⚠️ Resposta do Servidor (Código ' + code + '):\n' + response.getContentText());
-    }
-
-  } catch (err) {
-    ui.alert('❌ ERRO NO SCRIPT:\n\n' + err.toString());
-  }
-}
-
-function agendarSincronizacaoAutomatica() {
-  var ui = SpreadsheetApp.getUi();
-  try {
-    ScriptApp.newTrigger('sincronizarComAppSaga')
-      .timeBased()
-      .everyHours(1)
-      .create();
-    ui.alert('⏰ Sincronização automática agendada a cada 1 hora!');
-  } catch (e) {
-    ui.alert('❌ Erro ao agendar: ' + e.toString());
-  }
+  var res = processarDadosPlanilha();
+  ui.alert('✅ Sucesso!\n\nForam processados ' + res.totalOperators + ' colaboradores.\nTotal de produtividade: ' + res.totalProductivity);
 }
 `;
 

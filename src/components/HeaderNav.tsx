@@ -101,7 +101,7 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({
           <p className="text-[13px] font-semibold text-slate-500 mt-1 tracking-normal">
             {totalOperatorsCount > 0
               ? `${totalOperatorsCount} Colaboradores • Pódio 3D 4K • Navegação por Teclado (Setas ◀ ➔)`
-              : 'Aguardando Importação SAGA • Pódio 3D 4K • Firebase Realtime'}
+              : 'Aguardando Importação SAGA • Pódio 3D 4K • Google Sheets Web App'}
           </p>
         </div>
       </div>

@@ -9,7 +9,7 @@ import { LoginScreen } from './components/LoginScreen';
 import { ModalGoogleSheetsScript } from './components/ModalGoogleSheetsScript';
 import { EMPTY_OPERATORS, EMPTY_KPIS } from './data/productivityData';
 import { OperatorSummary, DashboardKPIs, PeriodPreset } from './types';
-import { ouvirRankingRealtime, carregarCacheLocal, salvarRankingRealtime, app } from './services/firebase';
+import { carregarCacheLocal, salvarCacheLocal, obterWebAppUrl } from './services/firebase';
 import { importarRankingDeSheets, FIXED_SPREADSHEET_ID } from './services/googleSheets';
 import { normalizarAtividade, parseDataBRTimestamp, matchActivity, isMovimentacaoUma } from './utils/rankingPdfParser';
 import { obterTurnoColaborador, salvarTurnoCustomizado } from './utils/turnos';
@@ -98,7 +98,7 @@ export default function App() {
   const [selectedOperator, setSelectedOperator] = useState<string | null>(null);
   const [isGoogleSheetsModalOpen, setIsGoogleSheetsModalOpen] = useState(false);
 
-  // Custom data if imported by user or loaded from Firebase Realtime Database
+  // Custom data loaded from Google Apps Script Web App or LocalStorage cache
   const [customOperators, setCustomOperators] = useState<OperatorSummary[] | null>(() => {
     const cached = carregarCacheLocal();
     return cached ? cached.operators : null;
@@ -110,52 +110,29 @@ export default function App() {
     }
     return null;
   });
-  const [isFirebaseConnected, setIsFirebaseConnected] = useState<boolean>(true);
 
-  // Listen to Firebase Realtime Database in real time
-  useEffect(() => {
-    const unsubscribe = ouvirRankingRealtime(
-      (data) => {
-        if (data) {
-          console.log("[Firebase Realtime Database] Dados recebidos em tempo real:", data);
-          setCustomOperators(data.operators || []);
-          setCustomLabel(formatarFrasePeriodo(data.label, data.operators || []));
-        } else {
-          setCustomOperators([]);
-          setCustomLabel(null);
-        }
-        setIsFirebaseConnected(true);
-      },
-      (err) => {
-        console.warn("[Firebase Realtime Database] Erro de conexão:", err);
-      }
-    );
-
-    return () => {
-      unsubscribe();
-    };
-  }, []);
-
-  // Automatic real-time sync with Google Sheets (1synVKAYxOm4dRUXEuw65u0Lv1erLF7-9PXeAUtSd-QA)
+  // Automatic real-time sync with Google Sheets Apps Script Web App or Spreadsheet ID
   useEffect(() => {
     const carregarPlanilhaAuto = async () => {
       try {
-        const operators = await importarRankingDeSheets(FIXED_SPREADSHEET_ID);
+        const webappUrl = obterWebAppUrl() || FIXED_SPREADSHEET_ID;
+        const operators = await importarRankingDeSheets(webappUrl);
         if (operators && operators.length > 0) {
-          const label = `PLANILHA SHEETS (ID: ${FIXED_SPREADSHEET_ID.slice(0, 6)}...) • ${operators.length} COLABORADORES`;
+          const label = `PLANILHA SHEETS WEB APP • ${operators.length} COLABORADORES`;
           setCustomOperators(operators);
-          setCustomLabel(formatarFrasePeriodo(label, operators));
-          salvarRankingRealtime(operators, label);
+          const formattedLabel = formatarFrasePeriodo(label, operators);
+          setCustomLabel(formattedLabel);
+          salvarCacheLocal(operators, formattedLabel);
         }
       } catch (err) {
-        console.info("[Google Sheets AutoSync] Aguardando permissão ou sincronização via Apps Script:", err);
+        console.info("[Google Sheets WebApp Sync] Aguardando conexão:", err);
       }
     };
 
     // Tenta carregar imediatamente na inicialização
     carregarPlanilhaAuto();
 
-    // Sincroniza a cada 30 segundos
+    // Sincroniza a cada 30 segundos com o Web App / Google Sheets
     const interval = setInterval(carregarPlanilhaAuto, 30000);
     return () => clearInterval(interval);
   }, []);
@@ -353,15 +330,13 @@ export default function App() {
 
     setCustomOperators(updated);
 
-    // 3. Persiste no Firebase Realtime Database
-    salvarRankingRealtime(
+    // 3. Persiste no LocalStorage cache
+    salvarCacheLocal(
       updated,
       customLabel || currentKPIs.periodLabel || 'Relatório SAGA',
       updated[0]?.dataInicio,
       updated[0]?.dataFim
-    ).catch((err) => {
-      console.warn('Erro ao salvar alteração de turno no Firebase:', err);
-    });
+    );
   };
 
   if (!isAuthenticated) {

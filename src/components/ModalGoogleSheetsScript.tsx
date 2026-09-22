@@ -17,6 +17,7 @@ import {
   ShieldAlert
 } from 'lucide-react';
 import { OFFICIAL_GOOGLE_APPS_SCRIPT, importarRankingDeSheets } from '../services/googleSheets';
+import { salvarWebAppUrl } from '../services/firebase';
 import { OperatorSummary } from '../types';
 
 const CORRECT_PASSWORD = '#trescafe2029';
@@ -62,8 +63,9 @@ export const ModalGoogleSheetsScript: React.FC<ModalGoogleSheetsScriptProps> = (
   };
 
   const handleFetchSheet = async () => {
-    if (!sheetInput.trim()) {
-      setStatusMsg({ text: 'Por favor, insira o link da planilha ou ID.', type: 'error' });
+    const trimmedInput = sheetInput.trim();
+    if (!trimmedInput) {
+      setStatusMsg({ text: 'Por favor, insira a URL do Web App, link da planilha ou ID.', type: 'error' });
       return;
     }
 
@@ -71,12 +73,16 @@ export const ModalGoogleSheetsScript: React.FC<ModalGoogleSheetsScriptProps> = (
     setStatusMsg({ text: 'Conectando e processando dados da planilha...', type: 'info' });
 
     try {
-      const operators = await importarRankingDeSheets(sheetInput.trim());
+      if (trimmedInput.includes('script.google.com') || trimmedInput.includes('/exec')) {
+        salvarWebAppUrl(trimmedInput);
+      }
+
+      const operators = await importarRankingDeSheets(trimmedInput);
       if (!operators || operators.length === 0) {
         throw new Error('Nenhum operador encontrado na planilha informada.');
       }
 
-      onImportData(operators, `PLANILHA SHEETS (${operators.length} COLABORADORES)`);
+      onImportData(operators, `PLANILHA SHEETS WEB APP (${operators.length} COLABORADORES)`);
       setStatusMsg({
         text: `✅ Sucesso! ${operators.length} colaboradores carregados com sucesso!`,
         type: 'success'
@@ -86,7 +92,7 @@ export const ModalGoogleSheetsScript: React.FC<ModalGoogleSheetsScriptProps> = (
       }, 1500);
     } catch (err: any) {
       setStatusMsg({
-        text: `❌ ${err.message || 'Erro ao carregar dados da planilha. Verifique as permissões de acesso.'}`,
+        text: `❌ ${err.message || 'Erro ao carregar dados da planilha. Verifique a URL do Web App.'}`,
         type: 'error'
       });
     } finally {
@@ -189,14 +195,14 @@ export const ModalGoogleSheetsScript: React.FC<ModalGoogleSheetsScriptProps> = (
           /* Content Body quando Desbloqueado */
           <div className="flex-1 overflow-y-auto p-6 space-y-6">
 
-            {/* Quick Option 1: Puxar por Link Direto */}
+            {/* Quick Option 1: Puxar por Web App ou Link Direto */}
             <div className="p-4 rounded-xl bg-slate-800/50 border border-slate-700/60 space-y-3">
               <div className="flex items-center gap-2 text-amber-400 font-bold text-sm">
                 <Zap className="w-4 h-4" />
-                OPÇÃO 1: PUXAR DIRETO PELO LINK DA PLANILHA
+                OPÇÃO 1: PUXAR DIRETO PELA URL DO WEB APP OU PLANILHA
               </div>
               <p className="text-xs text-slate-300">
-                Cole o link da sua planilha pública do Google Sheets ou ID para importar todos os colaboradores instantaneamente:
+                Cole a URL do Web App do Apps Script ou o link da sua planilha pública para conectar instantaneamente:
               </p>
 
               <div className="flex items-center gap-2">
@@ -204,7 +210,7 @@ export const ModalGoogleSheetsScript: React.FC<ModalGoogleSheetsScriptProps> = (
                   type="text"
                   value={sheetInput}
                   onChange={(e) => setSheetInput(e.target.value)}
-                  placeholder="Ex: https://docs.google.com/spreadsheets/d/1synVKAYxOm4dRUXEuw65u0Lv1erLF7-9PXeAUtSd-QA/edit"
+                  placeholder="Ex: https://script.google.com/macros/s/.../exec ou Link da Planilha"
                   className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 transition-colors"
                 />
                 <button
@@ -237,12 +243,12 @@ export const ModalGoogleSheetsScript: React.FC<ModalGoogleSheetsScriptProps> = (
               )}
             </div>
 
-            {/* Quick Option 2: Script do Apps Script */}
+            {/* Quick Option 2: Script do Apps Script Web App */}
             <div className="p-4 rounded-xl bg-slate-800/50 border border-emerald-500/30 space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-emerald-400 font-bold text-sm">
                   <Code2 className="w-4 h-4" />
-                  OPÇÃO 2: SCRIPT AUTOMÁTICO PARA O GOOGLE SHEETS (APPS SCRIPT)
+                  OPÇÃO 2: CÓDIGO WEB APP PARA O GOOGLE SHEETS (SEM FIREBASE)
                 </div>
                 <button
                   onClick={handleCopyScript}
@@ -267,30 +273,30 @@ export const ModalGoogleSheetsScript: React.FC<ModalGoogleSheetsScriptProps> = (
                 <div className="p-3 rounded-lg bg-slate-900 border border-slate-700/80 text-xs space-y-1">
                   <div className="flex items-center gap-1.5 font-bold text-amber-400">
                     <span className="w-4 h-4 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center text-[10px]">1</span>
-                    Abra o Apps Script
+                    Cole no Apps Script
                   </div>
                   <p className="text-[11px] text-slate-400">
-                    Na sua planilha, clique no menu <strong className="text-white">Extensões</strong> &gt; <strong className="text-white">Apps Script</strong>.
+                    Na planilha privada, abra <strong className="text-white">Extensões &gt; Apps Script</strong>, cole o código e salve (💾).
                   </p>
                 </div>
 
                 <div className="p-3 rounded-lg bg-slate-900 border border-slate-700/80 text-xs space-y-1">
                   <div className="flex items-center gap-1.5 font-bold text-amber-400">
                     <span className="w-4 h-4 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center text-[10px]">2</span>
-                    Cole o Código
+                    Implante como Web App
                   </div>
                   <p className="text-[11px] text-slate-400">
-                    Substitua todo o texto pelo script abaixo e clique em <strong className="text-white">Salvar (💾)</strong>.
+                    Clique em <strong className="text-white">Implantar &gt; Nova Implantação &gt; App da Web</strong>. Acesso: <strong className="text-white">Qualquer Pessoa</strong>.
                   </p>
                 </div>
 
                 <div className="p-3 rounded-lg bg-slate-900 border border-slate-700/80 text-xs space-y-1">
                   <div className="flex items-center gap-1.5 font-bold text-amber-400">
                     <span className="w-4 h-4 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center text-[10px]">3</span>
-                    Sincronize no Menu
+                    Cole a URL gerada
                   </div>
                   <p className="text-[11px] text-slate-400">
-                    Volte à planilha e clique no novo menu <strong className="text-emerald-400">⚡ SAGA WMS &gt; Sincronizar</strong>!
+                    Copie a URL do Web App gerada e cole na <strong className="text-emerald-400">Opção 1 acima</strong>!
                   </p>
                 </div>
               </div>
@@ -299,7 +305,7 @@ export const ModalGoogleSheetsScript: React.FC<ModalGoogleSheetsScriptProps> = (
               <div className="relative rounded-xl overflow-hidden bg-slate-950 border border-slate-800">
                 <div className="flex items-center justify-between px-4 py-2 bg-slate-900/90 border-b border-slate-800 text-[11px] font-mono text-slate-400">
                   <span>GoogleAppsScript.gs</span>
-                  <span className="text-emerald-400">Envio direto ao Realtime Database SAGA</span>
+                  <span className="text-emerald-400">Servidor Web App Google Sheets (doGet)</span>
                 </div>
                 <pre className="p-4 text-[11px] font-mono text-emerald-300 overflow-x-auto max-h-56 leading-relaxed select-text">
                   {OFFICIAL_GOOGLE_APPS_SCRIPT}
