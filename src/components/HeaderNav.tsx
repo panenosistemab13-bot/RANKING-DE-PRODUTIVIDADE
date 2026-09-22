@@ -57,23 +57,13 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({
       {/* Esquerda: Logo 3 Corações + Título do Dashboard */}
       <div className="flex items-center gap-5">
         {/* Logo Oficial 3 Corações */}
-        <div className="flex items-center gap-3 pr-5 border-r border-slate-300/70">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-500 via-orange-600 to-red-600 flex items-center justify-center text-white shadow-xl shadow-orange-600/30 border border-white/70 relative">
-            <svg viewBox="0 0 24 24" className="w-7 h-7 fill-white drop-shadow-sm">
-              <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
-            </svg>
-            <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-amber-400 border-2 border-white flex items-center justify-center text-[10px] font-black text-slate-900 shadow-xs">
-              3
-            </div>
-          </div>
-          <div>
-            <span className="block text-[16px] font-black text-slate-900 leading-tight tracking-tight font-heading">
-              3 CORAÇÕES
-            </span>
-            <span className="text-[10px] font-bold text-amber-700 tracking-wider uppercase">
-              Mais que café, relações
-            </span>
-          </div>
+        <div className="flex items-center pr-5 border-r border-slate-300/70">
+          <img 
+            src="https://lh3.googleusercontent.com/d/1vSNz-PVse-A8gnCp0ivV6feBT5lkM9lh" 
+            alt="3 Corações" 
+            className="h-12 w-auto object-contain mix-blend-multiply"
+            referrerPolicy="no-referrer"
+          />
         </div>
 
         <div>

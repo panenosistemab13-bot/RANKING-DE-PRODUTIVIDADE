@@ -9,10 +9,17 @@ import {
   Clock,
   Code2,
   ExternalLink,
-  Info
+  Info,
+  Lock,
+  KeyRound,
+  Eye,
+  EyeOff,
+  ShieldAlert
 } from 'lucide-react';
 import { OFFICIAL_GOOGLE_APPS_SCRIPT, importarRankingDeSheets } from '../services/googleSheets';
 import { OperatorSummary } from '../types';
+
+const CORRECT_PASSWORD = '#trescafe2029';
 
 interface ModalGoogleSheetsScriptProps {
   isOpen: boolean;
@@ -30,7 +37,23 @@ export const ModalGoogleSheetsScript: React.FC<ModalGoogleSheetsScriptProps> = (
   const [isLoading, setIsLoading] = useState(false);
   const [statusMsg, setStatusMsg] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
 
+  // Autenticação de Senha da Aba
+  const [isUnlocked, setIsUnlocked] = useState(false);
+  const [passwordInput, setPasswordInput] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+
   if (!isOpen) return null;
+
+  const handlePasswordSubmit = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (passwordInput.trim() === CORRECT_PASSWORD) {
+      setIsUnlocked(true);
+      setPasswordError(null);
+    } else {
+      setPasswordError('Senha incorreta! Digite a senha de acesso válida.');
+    }
+  };
 
   const handleCopyScript = () => {
     navigator.clipboard.writeText(OFFICIAL_GOOGLE_APPS_SCRIPT);
@@ -84,8 +107,12 @@ export const ModalGoogleSheetsScript: React.FC<ModalGoogleSheetsScriptProps> = (
             <div>
               <h3 className="text-lg font-black text-white tracking-tight flex items-center gap-2">
                 INTEGRAÇÃO GOOGLE SHEETS • SAGA WMS
-                <span className="text-[10px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full font-extrabold uppercase">
-                  Script Oficial
+                <span className={`text-[10px] px-2 py-0.5 rounded-full font-extrabold uppercase border ${
+                  isUnlocked 
+                    ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' 
+                    : 'bg-amber-500/20 text-amber-400 border-amber-500/30'
+                }`}>
+                  {isUnlocked ? 'Script Oficial' : 'Área Protegida'}
                 </span>
               </h3>
               <p className="text-xs text-slate-400">
@@ -101,136 +128,195 @@ export const ModalGoogleSheetsScript: React.FC<ModalGoogleSheetsScriptProps> = (
           </button>
         </div>
 
-        {/* Content Body */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
-
-          {/* Quick Option 1: Puxar por Link Direto */}
-          <div className="p-4 rounded-xl bg-slate-800/50 border border-slate-700/60 space-y-3">
-            <div className="flex items-center gap-2 text-amber-400 font-bold text-sm">
-              <Zap className="w-4 h-4" />
-              OPÇÃO 1: PUXAR DIRETO PELO LINK DA PLANILHA
+        {/* Tela de Senha se Bloqueado */}
+        {!isUnlocked ? (
+          <div className="flex-1 p-8 flex flex-col items-center justify-center text-center space-y-6 my-4">
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-500/20 to-amber-600/30 border border-amber-500/40 flex items-center justify-center text-amber-400 shadow-xl shadow-amber-500/10">
+              <Lock className="w-8 h-8" />
             </div>
-            <p className="text-xs text-slate-300">
-              Cole o link da sua planilha pública do Google Sheets ou ID para importar todos os colaboradores instantaneamente:
-            </p>
 
-            <div className="flex items-center gap-2">
-              <input
-                type="text"
-                value={sheetInput}
-                onChange={(e) => setSheetInput(e.target.value)}
-                placeholder="Ex: https://docs.google.com/spreadsheets/d/1synVKAYxOm4dRUXEuw65u0Lv1erLF7-9PXeAUtSd-QA/edit"
-                className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 transition-colors"
-              />
+            <div className="space-y-2 max-w-md">
+              <h4 className="text-xl font-black text-white tracking-tight flex items-center justify-center gap-2">
+                ÁREA RESTRITA DE INTEGRAÇÃO
+              </h4>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Esta aba é restrita aos administradores do SAGA WMS. Digite a senha de acesso para visualizar e importar os dados da planilha.
+              </p>
+            </div>
+
+            <form onSubmit={handlePasswordSubmit} className="w-full max-w-sm space-y-4">
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
+                  <KeyRound className="w-4 h-4" />
+                </div>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={passwordInput}
+                  onChange={(e) => {
+                    setPasswordInput(e.target.value);
+                    if (passwordError) setPasswordError(null);
+                  }}
+                  placeholder="Digite a senha de acesso..."
+                  autoFocus
+                  className="w-full pl-10 pr-10 py-3 bg-slate-950 border border-slate-700/80 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-all shadow-inner"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-500 hover:text-slate-300 transition-colors"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+
+              {passwordError && (
+                <div className="p-2.5 rounded-lg bg-red-500/20 border border-red-500/30 text-xs font-bold text-red-300 flex items-center justify-center gap-2">
+                  <ShieldAlert className="w-4 h-4 shrink-0 text-red-400" />
+                  {passwordError}
+                </div>
+              )}
+
               <button
-                onClick={handleFetchSheet}
-                disabled={isLoading}
-                className="px-4 py-2 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs flex items-center gap-2 transition-all shadow-md shadow-amber-500/20 disabled:opacity-50"
+                type="submit"
+                className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-amber-500 via-amber-600 to-amber-500 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-amber-500/25 transition-all active:scale-[0.98]"
               >
-                {isLoading ? (
-                  <>
-                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                    Carregando...
-                  </>
-                ) : (
-                  <>
-                    <FileSpreadsheet className="w-3.5 h-3.5" />
-                    Puxar Dados
-                  </>
-                )}
+                <Lock className="w-4 h-4" />
+                Desbloquear Acesso
               </button>
-            </div>
-
-            {statusMsg && (
-              <div className={`p-2.5 rounded-lg text-xs font-semibold ${
-                statusMsg.type === 'success' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' :
-                statusMsg.type === 'error' ? 'bg-red-500/20 text-red-300 border border-red-500/30' :
-                'bg-blue-500/20 text-blue-300 border border-blue-500/30'
-              }`}>
-                {statusMsg.text}
-              </div>
-            )}
+            </form>
           </div>
+        ) : (
+          /* Content Body quando Desbloqueado */
+          <div className="flex-1 overflow-y-auto p-6 space-y-6">
 
-          {/* Quick Option 2: Script do Apps Script */}
-          <div className="p-4 rounded-xl bg-slate-800/50 border border-emerald-500/30 space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-emerald-400 font-bold text-sm">
-                <Code2 className="w-4 h-4" />
-                OPÇÃO 2: SCRIPT AUTOMÁTICO PARA O GOOGLE SHEETS (APPS SCRIPT)
+            {/* Quick Option 1: Puxar por Link Direto */}
+            <div className="p-4 rounded-xl bg-slate-800/50 border border-slate-700/60 space-y-3">
+              <div className="flex items-center gap-2 text-amber-400 font-bold text-sm">
+                <Zap className="w-4 h-4" />
+                OPÇÃO 1: PUXAR DIRETO PELO LINK DA PLANILHA
               </div>
-              <button
-                onClick={handleCopyScript}
-                className="px-3 py-1.5 rounded-lg bg-emerald-500 text-slate-950 font-black text-xs flex items-center gap-1.5 hover:bg-emerald-400 transition-all shadow-md shadow-emerald-500/20"
-              >
-                {copied ? (
-                  <>
-                    <Check className="w-3.5 h-3.5" />
-                    Copiado!
-                  </>
-                ) : (
-                  <>
-                    <Copy className="w-3.5 h-3.5" />
-                    Copiar Script
-                  </>
-                )}
-              </button>
+              <p className="text-xs text-slate-300">
+                Cole o link da sua planilha pública do Google Sheets ou ID para importar todos os colaboradores instantaneamente:
+              </p>
+
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={sheetInput}
+                  onChange={(e) => setSheetInput(e.target.value)}
+                  placeholder="Ex: https://docs.google.com/spreadsheets/d/1synVKAYxOm4dRUXEuw65u0Lv1erLF7-9PXeAUtSd-QA/edit"
+                  className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 transition-colors"
+                />
+                <button
+                  onClick={handleFetchSheet}
+                  disabled={isLoading}
+                  className="px-4 py-2 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs flex items-center gap-2 transition-all shadow-md shadow-amber-500/20 disabled:opacity-50"
+                >
+                  {isLoading ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      Carregando...
+                    </>
+                  ) : (
+                    <>
+                      <FileSpreadsheet className="w-3.5 h-3.5" />
+                      Puxar Dados
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {statusMsg && (
+                <div className={`p-2.5 rounded-lg text-xs font-semibold ${
+                  statusMsg.type === 'success' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' :
+                  statusMsg.type === 'error' ? 'bg-red-500/20 text-red-300 border border-red-500/30' :
+                  'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                }`}>
+                  {statusMsg.text}
+                </div>
+              )}
             </div>
 
-            {/* Passo a Passo Visual */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <div className="p-3 rounded-lg bg-slate-900 border border-slate-700/80 text-xs space-y-1">
-                <div className="flex items-center gap-1.5 font-bold text-amber-400">
-                  <span className="w-4 h-4 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center text-[10px]">1</span>
-                  Abra o Apps Script
+            {/* Quick Option 2: Script do Apps Script */}
+            <div className="p-4 rounded-xl bg-slate-800/50 border border-emerald-500/30 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-emerald-400 font-bold text-sm">
+                  <Code2 className="w-4 h-4" />
+                  OPÇÃO 2: SCRIPT AUTOMÁTICO PARA O GOOGLE SHEETS (APPS SCRIPT)
                 </div>
-                <p className="text-[11px] text-slate-400">
-                  Na sua planilha, clique no menu <strong className="text-white">Extensões</strong> &gt; <strong className="text-white">Apps Script</strong>.
-                </p>
+                <button
+                  onClick={handleCopyScript}
+                  className="px-3 py-1.5 rounded-lg bg-emerald-500 text-slate-950 font-black text-xs flex items-center gap-1.5 hover:bg-emerald-400 transition-all shadow-md shadow-emerald-500/20"
+                >
+                  {copied ? (
+                    <>
+                      <Check className="w-3.5 h-3.5" />
+                      Copiado!
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3.5 h-3.5" />
+                      Copiar Script
+                    </>
+                  )}
+                </button>
               </div>
 
-              <div className="p-3 rounded-lg bg-slate-900 border border-slate-700/80 text-xs space-y-1">
-                <div className="flex items-center gap-1.5 font-bold text-amber-400">
-                  <span className="w-4 h-4 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center text-[10px]">2</span>
-                  Cole o Código
+              {/* Passo a Passo Visual */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="p-3 rounded-lg bg-slate-900 border border-slate-700/80 text-xs space-y-1">
+                  <div className="flex items-center gap-1.5 font-bold text-amber-400">
+                    <span className="w-4 h-4 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center text-[10px]">1</span>
+                    Abra o Apps Script
+                  </div>
+                  <p className="text-[11px] text-slate-400">
+                    Na sua planilha, clique no menu <strong className="text-white">Extensões</strong> &gt; <strong className="text-white">Apps Script</strong>.
+                  </p>
                 </div>
-                <p className="text-[11px] text-slate-400">
-                  Substitua todo o texto pelo script abaixo e clique em <strong className="text-white">Salvar (💾)</strong>.
-                </p>
+
+                <div className="p-3 rounded-lg bg-slate-900 border border-slate-700/80 text-xs space-y-1">
+                  <div className="flex items-center gap-1.5 font-bold text-amber-400">
+                    <span className="w-4 h-4 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center text-[10px]">2</span>
+                    Cole o Código
+                  </div>
+                  <p className="text-[11px] text-slate-400">
+                    Substitua todo o texto pelo script abaixo e clique em <strong className="text-white">Salvar (💾)</strong>.
+                  </p>
+                </div>
+
+                <div className="p-3 rounded-lg bg-slate-900 border border-slate-700/80 text-xs space-y-1">
+                  <div className="flex items-center gap-1.5 font-bold text-amber-400">
+                    <span className="w-4 h-4 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center text-[10px]">3</span>
+                    Sincronize no Menu
+                  </div>
+                  <p className="text-[11px] text-slate-400">
+                    Volte à planilha e clique no novo menu <strong className="text-emerald-400">⚡ SAGA WMS &gt; Sincronizar</strong>!
+                  </p>
+                </div>
               </div>
 
-              <div className="p-3 rounded-lg bg-slate-900 border border-slate-700/80 text-xs space-y-1">
-                <div className="flex items-center gap-1.5 font-bold text-amber-400">
-                  <span className="w-4 h-4 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center text-[10px]">3</span>
-                  Sincronize no Menu
+              {/* Script Code Viewer */}
+              <div className="relative rounded-xl overflow-hidden bg-slate-950 border border-slate-800">
+                <div className="flex items-center justify-between px-4 py-2 bg-slate-900/90 border-b border-slate-800 text-[11px] font-mono text-slate-400">
+                  <span>GoogleAppsScript.gs</span>
+                  <span className="text-emerald-400">Envio direto ao Realtime Database SAGA</span>
                 </div>
-                <p className="text-[11px] text-slate-400">
-                  Volte à planilha e clique no novo menu <strong className="text-emerald-400">⚡ SAGA WMS &gt; Sincronizar</strong>!
-                </p>
+                <pre className="p-4 text-[11px] font-mono text-emerald-300 overflow-x-auto max-h-56 leading-relaxed select-text">
+                  {OFFICIAL_GOOGLE_APPS_SCRIPT}
+                </pre>
               </div>
             </div>
 
-            {/* Script Code Viewer */}
-            <div className="relative rounded-xl overflow-hidden bg-slate-950 border border-slate-800">
-              <div className="flex items-center justify-between px-4 py-2 bg-slate-900/90 border-b border-slate-800 text-[11px] font-mono text-slate-400">
-                <span>GoogleAppsScript.gs</span>
-                <span className="text-emerald-400">Envio direto ao Realtime Database SAGA</span>
+            {/* Dica do Sistema */}
+            <div className="flex items-start gap-2.5 p-3.5 rounded-xl bg-blue-950/40 border border-blue-500/30 text-xs text-blue-200">
+              <Info className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
+              <div>
+                <strong className="text-blue-300">Regra de Deduplicação SAGA mantida:</strong> O script calcula a produtividade real por contagem única de U.M.A.s e agrupa todas as ordens, turnos e atividades de cada colaborador automaticamente!
               </div>
-              <pre className="p-4 text-[11px] font-mono text-emerald-300 overflow-x-auto max-h-56 leading-relaxed select-text">
-                {OFFICIAL_GOOGLE_APPS_SCRIPT}
-              </pre>
             </div>
+
           </div>
-
-          {/* Dica do Sistema */}
-          <div className="flex items-start gap-2.5 p-3.5 rounded-xl bg-blue-950/40 border border-blue-500/30 text-xs text-blue-200">
-            <Info className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
-            <div>
-              <strong className="text-blue-300">Regra de Deduplicação SAGA mantida:</strong> O script calcula a produtividade real por contagem única de U.M.A.s e agrupa todas as ordens, turnos e atividades de cada colaborador automaticamente!
-            </div>
-          </div>
-
-        </div>
+        )}
 
         {/* Footer */}
         <div className="px-6 py-3.5 bg-slate-950 border-t border-slate-800 flex items-center justify-between">

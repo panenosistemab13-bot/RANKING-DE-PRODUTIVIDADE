@@ -18,23 +18,12 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
     <aside className="w-[84px] h-full flex flex-col items-center py-6 border-r border-white/40 bg-white/40 backdrop-blur-xl z-20 shrink-0 select-none">
       {/* 3 Corações Brand Logo */}
       <div className="flex flex-col items-center mb-8 group cursor-pointer" onClick={() => onSelectTab('ranking')}>
-        <div className="relative w-12 h-12 rounded-2xl bg-gradient-to-br from-red-600 to-amber-600 flex items-center justify-center shadow-lg shadow-red-900/20 group-hover:scale-105 transition-transform duration-200">
-          {/* Heart logo silhouette */}
-          <div className="flex items-center justify-center text-white">
-            <svg viewBox="0 0 24 24" className="w-7 h-7 fill-white drop-shadow">
-              <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-            </svg>
-          </div>
-          <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-amber-400 border-2 border-white flex items-center justify-center">
-            <span className="text-[9px] font-black text-slate-900">3</span>
-          </div>
-        </div>
-        <span className="text-[10px] font-extrabold tracking-tight text-slate-800 mt-1.5 leading-none">
-          3 Corações
-        </span>
-        <span className="text-[7.5px] font-medium text-slate-500 tracking-tighter scale-90">
-          Mais que café
-        </span>
+        <img 
+          src="https://lh3.googleusercontent.com/d/1vSNz-PVse-A8gnCp0ivV6feBT5lkM9lh" 
+          alt="3 Corações" 
+          className="w-16 h-auto object-contain mix-blend-multiply group-hover:scale-105 transition-transform duration-200"
+          referrerPolicy="no-referrer"
+        />
       </div>
 
       {/* Navigation Icons Menu */}
