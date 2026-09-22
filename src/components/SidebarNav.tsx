@@ -5,12 +5,14 @@ interface SidebarNavProps {
   activeTab: string;
   onSelectTab: (tab: string) => void;
   onOpenDataModal: () => void;
+  onOpenGoogleSheetsModal?: () => void;
 }
 
 export const SidebarNav: React.FC<SidebarNavProps> = ({
   activeTab,
   onSelectTab,
-  onOpenDataModal
+  onOpenDataModal,
+  onOpenGoogleSheetsModal
 }) => {
   return (
     <aside className="w-[84px] h-full flex flex-col items-center py-6 border-r border-white/40 bg-white/40 backdrop-blur-xl z-20 shrink-0 select-none">
@@ -85,13 +87,13 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
         </button>
 
         <button
-          onClick={onOpenDataModal}
-          title="Exportar / Importar Excel"
+          onClick={onOpenGoogleSheetsModal || onOpenDataModal}
+          title="Google Sheets Sincronização & Script"
           className="w-12 h-12 rounded-2xl flex items-center justify-center text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 transition-all duration-200 relative group"
         >
           <FileSpreadsheet className="w-5 h-5" />
           <span className="absolute left-14 bg-slate-900 text-white text-xs px-2.5 py-1 rounded-lg font-medium opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity shadow-lg whitespace-nowrap z-50">
-            Dados Excel / CSV
+            Google Sheets & Script
           </span>
         </button>
 

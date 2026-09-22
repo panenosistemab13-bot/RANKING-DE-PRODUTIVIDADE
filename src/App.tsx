@@ -6,9 +6,11 @@ import { LayerResumoGeral } from './components/LayerResumoGeral';
 import { LayerRankingTable } from './components/LayerRankingTable';
 import { LayerCinematicShowcase } from './components/LayerCinematicShowcase';
 import { LoginScreen } from './components/LoginScreen';
+import { ModalGoogleSheetsScript } from './components/ModalGoogleSheetsScript';
 import { EMPTY_OPERATORS, EMPTY_KPIS } from './data/productivityData';
 import { OperatorSummary, DashboardKPIs, PeriodPreset } from './types';
 import { ouvirRankingRealtime, carregarCacheLocal, salvarRankingRealtime, app } from './services/firebase';
+import { importarRankingDeSheets, FIXED_SPREADSHEET_ID } from './services/googleSheets';
 import { normalizarAtividade, parseDataBRTimestamp, matchActivity, isMovimentacaoUma } from './utils/rankingPdfParser';
 import { obterTurnoColaborador, salvarTurnoCustomizado } from './utils/turnos';
 
@@ -94,6 +96,7 @@ export default function App() {
   const [selectedActivity, setSelectedActivity] = useState<string>('TODAS AS ATIVIDADES');
   const [selectedTurno, setSelectedTurno] = useState<string>('TODOS');
   const [selectedOperator, setSelectedOperator] = useState<string | null>(null);
+  const [isGoogleSheetsModalOpen, setIsGoogleSheetsModalOpen] = useState(false);
 
   // Custom data if imported by user or loaded from Firebase Realtime Database
   const [customOperators, setCustomOperators] = useState<OperatorSummary[] | null>(() => {
@@ -131,6 +134,30 @@ export default function App() {
     return () => {
       unsubscribe();
     };
+  }, []);
+
+  // Automatic real-time sync with Google Sheets (1synVKAYxOm4dRUXEuw65u0Lv1erLF7-9PXeAUtSd-QA)
+  useEffect(() => {
+    const carregarPlanilhaAuto = async () => {
+      try {
+        const operators = await importarRankingDeSheets(FIXED_SPREADSHEET_ID);
+        if (operators && operators.length > 0) {
+          const label = `PLANILHA SHEETS (ID: ${FIXED_SPREADSHEET_ID.slice(0, 6)}...) • ${operators.length} COLABORADORES`;
+          setCustomOperators(operators);
+          setCustomLabel(formatarFrasePeriodo(label, operators));
+          salvarRankingRealtime(operators, label);
+        }
+      } catch (err) {
+        console.info("[Google Sheets AutoSync] Aguardando permissão ou sincronização via Apps Script:", err);
+      }
+    };
+
+    // Tenta carregar imediatamente na inicialização
+    carregarPlanilhaAuto();
+
+    // Sincroniza a cada 30 segundos
+    const interval = setInterval(carregarPlanilhaAuto, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   // Viewport dimensions for proportional scaling
@@ -171,7 +198,7 @@ export default function App() {
     }
 
     // 2. Filtro por Atividade
-    if (selectedActivity && selectedActivity !== 'TODAS AS ATIVIDADES' && !isMovimentacaoUma(selectedActivity)) {
+    if (selectedActivity && selectedActivity !== 'TODAS AS ATIVIDADES') {
       list = list
         .map((colab) => {
           if (colab.registrosDetalhados && colab.registrosDetalhados.length > 0) {
@@ -378,6 +405,7 @@ export default function App() {
                 onToggleView={setViewMode}
                 userEmail={userEmail}
                 onLogout={handleLogout}
+                onOpenGoogleSheetsModal={() => setIsGoogleSheetsModalOpen(true)}
               />
 
               {/* =========================================================================
@@ -459,6 +487,13 @@ export default function App() {
               )}
             </main>
           </div>
+
+      {/* Modal de Integração com Google Sheets & Apps Script */}
+      <ModalGoogleSheetsScript
+        isOpen={isGoogleSheetsModalOpen}
+        onClose={() => setIsGoogleSheetsModalOpen(false)}
+        onImportData={handleImportCustomData}
+      />
     </div>
   );
 }

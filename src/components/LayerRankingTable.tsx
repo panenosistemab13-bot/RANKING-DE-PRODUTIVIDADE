@@ -123,24 +123,24 @@ export const LayerRankingTable: React.FC<LayerRankingTableProps> = ({
     operators.forEach((op) => {
       if (op.registrosDetalhados) {
         op.registrosDetalhados.forEach((r) => {
-          if (r.atividade && !isMovimentacaoUma(r.atividade)) {
+          if (r.atividade) {
             foundSet.add(r.atividade.trim());
           }
         });
       }
-      if (op.topActivity && !isMovimentacaoUma(op.topActivity)) {
+      if (op.topActivity) {
         foundSet.add(op.topActivity.trim());
       }
       if (op.activitiesCount) {
         Object.keys(op.activitiesCount).forEach((act) => {
-          if (!isMovimentacaoUma(act)) {
+          if (act) {
             foundSet.add(act.replace(/_/g, '/').trim());
           }
         });
       }
       if (op.activitiesMetrics) {
         Object.keys(op.activitiesMetrics).forEach((act) => {
-          if (!isMovimentacaoUma(act)) {
+          if (act) {
             foundSet.add((act || "").toUpperCase().replace(/_/g, '/').trim());
           }
         });
@@ -148,11 +148,11 @@ export const LayerRankingTable: React.FC<LayerRankingTableProps> = ({
     });
 
     standard.forEach((s) => {
-      if (!isMovimentacaoUma(s)) foundSet.add(s);
+      foundSet.add(s);
     });
 
     foundSet.forEach((item) => {
-      if (item && (item || "").toUpperCase() !== 'TODAS AS ATIVIDADES' && !isMovimentacaoUma(item)) {
+      if (item && (item || "").toUpperCase() !== 'TODAS AS ATIVIDADES') {
         list.push(item);
       }
     });
