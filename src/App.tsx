@@ -13,6 +13,7 @@ import { ouvirRankingRealtime, carregarCacheLocal, salvarRankingRealtime, app } 
 import { importarRankingDeSheets, FIXED_SPREADSHEET_ID } from './services/googleSheets';
 import { normalizarAtividade, parseDataBRTimestamp, matchActivity, isMovimentacaoUma } from './utils/rankingPdfParser';
 import { obterTurnoColaborador, salvarTurnoCustomizado } from './utils/turnos';
+import { initAuth, logoutGoogle } from './services/googleAuth';
 
 function formatarFrasePeriodo(label: string | null | undefined, operators: OperatorSummary[]): string {
   // Se o rótulo já contém a frase completa solicitada
@@ -70,14 +71,31 @@ function formatarFrasePeriodo(label: string | null | undefined, operators: Opera
 }
 
 export default function App() {
-  // Autenticação de Usuário e Controle de Sessão
+  // Autenticação de Usuário e Controle de Sessão Real
   const [userEmail, setUserEmail] = useState<string | null>(() => {
-    return localStorage.getItem('saga_logged_user_email') || 'panenosistemab13@gmail.com';
+    return sessionStorage.getItem('saga_oauth_access_token') ? localStorage.getItem('saga_logged_user_email') : null;
   });
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    const saved = localStorage.getItem('saga_logged_user_email');
-    return saved !== null && saved !== '';
+    return !!sessionStorage.getItem('saga_oauth_access_token') && !!localStorage.getItem('saga_logged_user_email');
   });
+
+  useEffect(() => {
+    const unsubscribe = initAuth(
+      (user, token) => {
+        setUserEmail(user.email);
+        setIsAuthenticated(true);
+        localStorage.setItem('saga_logged_user_email', user.email || '');
+      },
+      () => {
+        setIsAuthenticated(false);
+        setUserEmail(null);
+        localStorage.removeItem('saga_logged_user_email');
+      }
+    );
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, []);
 
   const handleLogin = (email: string) => {
     setUserEmail(email);
@@ -85,7 +103,12 @@ export default function App() {
     localStorage.setItem('saga_logged_user_email', email);
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await logoutGoogle();
+    } catch (e) {
+      console.error('Erro ao efetuar logout:', e);
+    }
     setUserEmail(null);
     setIsAuthenticated(false);
     localStorage.removeItem('saga_logged_user_email');

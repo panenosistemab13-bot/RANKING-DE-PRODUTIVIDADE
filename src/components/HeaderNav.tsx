@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, MapPin, SlidersHorizontal, Monitor, Trophy, TableProperties, Maximize, Minimize, LogOut, User } from 'lucide-react';
+import { Calendar, MapPin, SlidersHorizontal, Monitor, Trophy, TableProperties, Maximize, Minimize, LogOut, User, Mail } from 'lucide-react';
 import { PeriodPreset } from '../types';
 
 interface HeaderNavProps {
@@ -13,6 +13,7 @@ interface HeaderNavProps {
   userEmail?: string | null;
   onLogout?: () => void;
   onOpenGoogleSheetsModal?: () => void;
+  onOpenGmailModal?: () => void;
 }
 
 export const HeaderNav: React.FC<HeaderNavProps> = ({
@@ -25,7 +26,8 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({
   onToggleView,
   userEmail,
   onLogout,
-  onOpenGoogleSheetsModal
+  onOpenGoogleSheetsModal,
+  onOpenGmailModal
 }) => {
   const [showPeriodDropdown, setShowPeriodDropdown] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -127,6 +129,24 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({
             </span>
           </div>
         </button>
+
+        {/* Botão de Enviar por E-mail (Gmail API) */}
+        {onOpenGmailModal && (
+          <button
+            onClick={onOpenGmailModal}
+            title="Enviar Relatório de Produtividade SAGA por E-mail (Gmail API)"
+            className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-500/10 hover:bg-amber-500/20 border border-amber-300/80 shadow-xs text-amber-950 backdrop-blur-md transition-all duration-200 cursor-pointer group select-none shrink-0"
+          >
+            <div className="w-5 h-5 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white shadow-2xs">
+              <Mail className="w-3 h-3 text-white" />
+            </div>
+            <div className="text-left leading-tight">
+              <span className="text-[11px] font-black text-amber-900 tracking-tight uppercase font-heading">
+                Enviar E-mail (Gmail)
+              </span>
+            </div>
+          </button>
+        )}
 
         {/* Slogan with Heart Logo */}
         <div className="flex items-center gap-2 pl-1 select-none">

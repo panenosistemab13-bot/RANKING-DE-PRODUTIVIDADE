@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Shield, MapPin, BarChart2, Target, ArrowRight } from 'lucide-react';
+import { Shield, MapPin, BarChart2, Target, ArrowRight, ShieldAlert } from 'lucide-react';
 import bgImage from '../assets/images/saga_login_bg_1790075329836.jpg';
+import { googleSignIn } from '../services/googleAuth';
 
 interface LoginScreenProps {
   onLogin: (email: string) => void;
@@ -12,13 +13,24 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   defaultEmail = 'panenosistemab13@gmail.com'
 }) => {
   const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const handleGoogleLogin = () => {
+  const handleGoogleLogin = async () => {
     setLoading(true);
-    setTimeout(() => {
+    setErrorMsg(null);
+    try {
+      const result = await googleSignIn();
+      if (result && result.user && result.user.email) {
+        onLogin(result.user.email);
+      } else {
+        throw new Error('E-mail não retornado pela conta Google.');
+      }
+    } catch (err: any) {
+      console.error('Erro de login:', err);
+      setErrorMsg(err.message || 'Erro de autenticação Google. Tente novamente.');
+    } finally {
       setLoading(false);
-      onLogin(defaultEmail);
-    }, 500);
+    }
   };
 
   return (
@@ -124,6 +136,13 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             Faça login com sua conta Google autorizada para acessar<br className="hidden sm:inline" />
             o painel de produtividade em tempo real.
           </p>
+
+          {errorMsg && (
+            <div className="w-full max-w-[400px] mx-auto mb-5 p-3 rounded-2xl bg-red-500/15 border border-red-500/30 text-xs text-red-200 flex items-center gap-2 text-left">
+              <ShieldAlert className="w-4 h-4 text-red-400 shrink-0" />
+              <span>{errorMsg}</span>
+            </div>
+          )}
 
           {/* 8. GOOGLE LOGIN BUTTON */}
           <button
