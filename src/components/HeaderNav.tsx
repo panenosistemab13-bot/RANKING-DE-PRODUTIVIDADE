@@ -91,7 +91,73 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({
 
       {/* Right Badges & Controls */}
       <div className="flex items-center gap-3.5">
-        {/* Período Pill Selector Removed */}
+        {/* Período Pill Selector */}
+        <div className="relative">
+          <button
+            onClick={() => setShowPeriodDropdown(!showPeriodDropdown)}
+            className="flex items-center gap-3 px-4 py-2 rounded-2xl bg-white/90 hover:bg-white border border-slate-200/80 shadow-sm backdrop-blur-md transition-all duration-150 cursor-pointer text-slate-800 group"
+          >
+            <div className="w-7 h-7 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600 group-hover:bg-amber-100 transition-colors">
+              <Calendar className="w-3.5 h-3.5" />
+            </div>
+            <div className="text-left leading-tight">
+              <span className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+                Período
+              </span>
+              <span className="text-[12px] font-bold text-slate-800 tracking-tight whitespace-nowrap">
+                {periodLabel}
+              </span>
+            </div>
+          </button>
+
+          {showPeriodDropdown && (
+            <div className="absolute right-0 mt-2 w-64 rounded-2xl bg-white/95 backdrop-blur-2xl border border-slate-200/90 shadow-2xl p-2 z-50 animate-in fade-in zoom-in-95 duration-150">
+              <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                Selecione o Intervalo
+              </div>
+              <button
+                onClick={() => {
+                  onSelectPeriodPreset('reference');
+                  setShowPeriodDropdown(false);
+                }}
+                className={`w-full text-left px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center justify-between transition-colors ${
+                  periodPreset === 'reference'
+                    ? 'bg-amber-500 text-white'
+                    : 'text-slate-700 hover:bg-slate-100'
+                }`}
+              >
+                <span>Referência Oficial (01/09 - 04/09)</span>
+                {periodPreset === 'reference' && <span className="text-[10px]">★ Ativo</span>}
+              </button>
+              <button
+                onClick={() => {
+                  onSelectPeriodPreset('full');
+                  setShowPeriodDropdown(false);
+                }}
+                className={`w-full text-left px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center justify-between transition-colors mt-1 ${
+                  periodPreset === 'full'
+                    ? 'bg-amber-500 text-white'
+                    : 'text-slate-700 hover:bg-slate-100'
+                }`}
+              >
+                <span>Mês Completo SAGA (01/09 - 19/09)</span>
+                {periodPreset === 'full' && <span className="text-[10px]">★ Ativo</span>}
+              </button>
+              <div className="border-t border-slate-100 my-1 pt-1">
+                <button
+                  onClick={() => {
+                    setShowPeriodDropdown(false);
+                    onOpenDataModal();
+                  }}
+                  className="w-full text-left px-3.5 py-2 rounded-xl text-xs font-medium text-amber-700 hover:bg-amber-50 flex items-center gap-2"
+                >
+                  <SlidersHorizontal className="w-3.5 h-3.5" />
+                  Personalizar Dados / Importar PDF
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Site Pill */}
         <div className="flex items-center gap-3 px-4 py-2 rounded-2xl bg-white/90 border border-slate-200/80 shadow-sm backdrop-blur-md text-slate-800">

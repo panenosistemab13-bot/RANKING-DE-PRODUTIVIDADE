@@ -58,33 +58,23 @@ export async function salvarRankingRealtime(
   dataInicio?: string,
   dataFim?: string
 ): Promise<void> {
-  // Assegura que todos os valores numéricos são válidos (evita NaN)
-  const operatorsClean = operators.map(op => ({
-    ...op,
-    totalProductivity: Number(op.totalProductivity) || 0,
-    movements: Number(op.movements) || 0,
-    participation: Number(op.participation) || 0,
-    trendGrowth: Number(op.trendGrowth) || 0,
-    rank: Number(op.rank) || 1
-  }));
-
-  const totalProd = operatorsClean.reduce((acc, curr) => acc + curr.totalProductivity, 0);
-  const totalMov = operatorsClean.reduce((acc, curr) => acc + curr.movements, 0);
+  const totalProd = operators.reduce((acc, curr) => acc + curr.totalProductivity, 0);
+  const totalMov = operators.reduce((acc, curr) => acc + curr.movements, 0);
 
   const payload: FirebaseRankingData = {
-    operators: operatorsClean,
+    operators,
     label,
     dataInicio,
     dataFim,
     updatedAt: new Date().toISOString(),
-    totalOperators: operatorsClean.length,
+    totalOperators: operators.length,
     totalProductivity: totalProd,
     totalMovements: totalMov
   };
 
   // 1. Salva no localStorage para carregamento instantâneo sem flicker ao recarregar
   try {
-    localStorage.setItem(LOCAL_STORAGE_KEY_OPERATORS, JSON.stringify(operatorsClean));
+    localStorage.setItem(LOCAL_STORAGE_KEY_OPERATORS, JSON.stringify(operators));
     localStorage.setItem(LOCAL_STORAGE_KEY_LABEL, label);
   } catch (e) {
     console.warn("Erro ao salvar no LocalStorage:", e);

@@ -158,7 +158,7 @@ export const LayerCinematicShowcase: React.FC<LayerCinematicShowcaseProps> = ({
             NENHUM RELATÓRIO CARREGADO
           </h2>
           <p className="text-sm font-semibold text-slate-500 mb-6 leading-relaxed">
-            Nenhum relatório carregado. Importe o arquivo PDF do Relatório de Produtividade SAGA ou aguarde a sincronização com o banco de dados.
+            As informações de teste foram limpas. Importe o arquivo PDF oficial do Relatório de Produtividade SAGA ou aguarde a sincronização em tempo real do Firebase Realtime Database.
           </p>
           <div className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-amber-500 text-white font-bold text-sm shadow-lg shadow-amber-500/25">
             <span>Clique em "Firebase Realtime / Importar" no topo</span>
