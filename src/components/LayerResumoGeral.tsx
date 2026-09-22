@@ -210,21 +210,6 @@ export const LayerResumoGeral: React.FC<LayerResumoGeralProps> = ({
           </div>
         </div>
 
-        {/* Período dos Dados Box */}
-        <div className="flex items-center gap-3 px-3.5 py-2.5 rounded-2xl bg-white/80 border border-slate-200/80 shadow-xs">
-          <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
-            <Calendar className="w-4 h-4" />
-          </div>
-          <div className="min-w-0">
-            <span className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wide">
-              Período dos Dados
-            </span>
-            <span className="text-[13px] font-extrabold text-slate-900 truncate block">
-              {kpis.periodLabel}
-            </span>
-          </div>
-        </div>
-
         {/* IMPORTAR PDF DO SAGA (Botão Dourado 3D em Destaque) */}
         <div
           onClick={onOpenImportPDF}
