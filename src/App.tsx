@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { getAuth, onAuthStateChanged, User } from 'firebase/auth';
 import { LayerBackground } from './components/LayerBackground';
 import { HeaderNav } from './components/HeaderNav';
 import { LayerPodium3D } from './components/LayerPodium3D';
@@ -9,8 +10,7 @@ import { DataImportExportModal } from './components/DataImportExportModal';
 import { LoginModal } from './components/LoginModal';
 import { EMPTY_OPERATORS, EMPTY_KPIS } from './data/productivityData';
 import { OperatorSummary, DashboardKPIs, PeriodPreset } from './types';
-import { ouvirRankingRealtime, carregarCacheLocal, salvarRankingRealtime } from './services/firebase';
-import { getCurrentUser } from './services/googleAuth';
+import { ouvirRankingRealtime, carregarCacheLocal, salvarRankingRealtime, app } from './services/firebase';
 import { normalizarAtividade, parseDataBRTimestamp } from './utils/rankingPdfParser';
 import { obterTurnoColaborador, salvarTurnoCustomizado } from './utils/turnos';
 
@@ -70,7 +70,8 @@ function formatarFrasePeriodo(label: string | null | undefined, operators: Opera
 }
 
 export default function App() {
-  const [user, setUser] = useState(getCurrentUser());
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
   const [periodPreset, setPeriodPreset] = useState<PeriodPreset>('reference');
   const [viewMode, setViewMode] = useState<'showcase' | 'list'>('showcase');
   const [selectedActivity, setSelectedActivity] = useState<string>('TODAS AS ATIVIDADES');
@@ -91,6 +92,16 @@ export default function App() {
     return null;
   });
   const [isFirebaseConnected, setIsFirebaseConnected] = useState<boolean>(true);
+
+  // Auth listener
+  useEffect(() => {
+    const auth = getAuth(app);
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      setLoading(false);
+    });
+    return unsubscribe;
+  }, []);
 
   // Listen to Firebase Realtime Database in real time
   useEffect(() => {
@@ -333,7 +344,11 @@ export default function App() {
 
   return (
     <div className="app-viewport select-none">
-      {!user ? (
+      {loading ? (
+        <div className="flex items-center justify-center min-h-screen bg-[#05091B] text-white">
+          <div className="animate-pulse">Carregando SAGA...</div>
+        </div>
+      ) : !user ? (
         <LoginModal onLoginSuccess={setUser} />
       ) : (
         <>
