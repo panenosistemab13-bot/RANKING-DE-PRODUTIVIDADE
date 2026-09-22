@@ -6,7 +6,6 @@ import { LayerPodium3D } from './components/LayerPodium3D';
 import { LayerResumoGeral } from './components/LayerResumoGeral';
 import { LayerRankingTable } from './components/LayerRankingTable';
 import { LayerCinematicShowcase } from './components/LayerCinematicShowcase';
-import { DataImportExportModal } from './components/DataImportExportModal';
 import { LoginModal } from './components/LoginModal';
 import { EMPTY_OPERATORS, EMPTY_KPIS } from './data/productivityData';
 import { OperatorSummary, DashboardKPIs, PeriodPreset } from './types';
@@ -77,7 +76,6 @@ export default function App() {
   const [selectedActivity, setSelectedActivity] = useState<string>('TODAS AS ATIVIDADES');
   const [selectedTurno, setSelectedTurno] = useState<string>('TODOS');
   const [selectedOperator, setSelectedOperator] = useState<string | null>(null);
-  const [isDataModalOpen, setIsDataModalOpen] = useState(false);
 
   // Custom data if imported by user or loaded from Firebase Realtime Database
   const [customOperators, setCustomOperators] = useState<OperatorSummary[] | null>(() => {
@@ -107,10 +105,13 @@ export default function App() {
   useEffect(() => {
     const unsubscribe = ouvirRankingRealtime(
       (data) => {
-        if (data && data.operators) {
+        if (data) {
           console.log("[Firebase Realtime Database] Dados recebidos em tempo real:", data);
-          setCustomOperators(data.operators);
-          setCustomLabel(formatarFrasePeriodo(data.label, data.operators));
+          setCustomOperators(data.operators || []);
+          setCustomLabel(formatarFrasePeriodo(data.label, data.operators || []));
+        } else {
+          setCustomOperators([]);
+          setCustomLabel(null);
         }
         setIsFirebaseConnected(true);
       },
@@ -378,7 +379,6 @@ export default function App() {
                 periodLabel={currentKPIs.periodLabel}
                 siteLabel={currentKPIs.siteLabel}
                 totalOperatorsCount={rawActiveOperators.length}
-                onOpenDataModal={() => setIsDataModalOpen(true)}
                 activeView={viewMode}
                 onToggleView={setViewMode}
               />
@@ -412,7 +412,6 @@ export default function App() {
                         variant="left"
                         kpis={currentKPIs}
                         onFilterActivity={setSelectedActivity}
-                        onOpenImportPDF={() => setIsDataModalOpen(true)}
                       />
                     </div>
 
@@ -436,7 +435,6 @@ export default function App() {
                         variant="right"
                         kpis={currentKPIs}
                         onFilterActivity={setSelectedActivity}
-                        onOpenImportPDF={() => setIsDataModalOpen(true)}
                       />
                     </div>
                   </section>
@@ -462,16 +460,6 @@ export default function App() {
               )}
             </main>
           </div>
-
-          {/* MODAL DE IMPORTAÇÃO/EXPORTAÇÃO DE DADOS */}
-          <DataImportExportModal
-            isOpen={isDataModalOpen}
-            onClose={() => setIsDataModalOpen(false)}
-            operators={rawActiveOperators}
-            periodPreset={periodPreset}
-            onSelectPeriodPreset={handleSelectPeriodPreset}
-            onImportCustomData={handleImportCustomData}
-          />
         </>
       )}
     </div>

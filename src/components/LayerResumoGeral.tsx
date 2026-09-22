@@ -210,22 +210,20 @@ export const LayerResumoGeral: React.FC<LayerResumoGeralProps> = ({
           </div>
         </div>
 
-        {/* IMPORTAR PDF DO SAGA (Botão Dourado 3D em Destaque) */}
-        <div
-          onClick={onOpenImportPDF}
-          role="button"
-          tabIndex={0}
-          className="cursor-pointer group flex items-center justify-center gap-3 px-4 py-3 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 text-white shadow-lg shadow-amber-600/30 hover:brightness-110 active:scale-[0.98] transition-all border border-amber-300/60"
-        >
-          <div className="w-8 h-8 rounded-xl bg-white/25 backdrop-blur-md flex items-center justify-center text-white shrink-0 group-hover:scale-110 transition-transform shadow-sm">
-            <FileUp className="w-4.5 h-4.5 stroke-[2.5]" />
+        {/* STATUS DA PLANILHA GOOGLE EM TEMPO REAL */}
+        <div className="flex items-center justify-center gap-3 px-4 py-3 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 text-white shadow-lg shadow-emerald-700/25 border border-emerald-400/40 select-none">
+          <div className="w-8 h-8 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center text-white shrink-0 shadow-sm">
+            <svg viewBox="0 0 24 24" className="w-4.5 h-4.5 fill-white">
+              <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/>
+            </svg>
           </div>
           <div className="text-left">
-            <span className="block text-[9.5px] font-extrabold text-amber-100 tracking-wider uppercase leading-tight">
-              GERENCIAR DADOS DO SAGA
+            <span className="block text-[9.5px] font-extrabold text-emerald-100 tracking-wider uppercase leading-tight">
+              PLANILHA GOOGLE INTEGRADA
             </span>
-            <span className="text-[14px] font-black tracking-tight text-white uppercase font-heading leading-tight">
-              IMPORTAR RELATÓRIO PDF
+            <span className="text-[13px] font-black tracking-tight text-white uppercase font-heading leading-tight flex items-center gap-1.5">
+              TEMPO REAL AUTOMÁTICO
+              <span className="w-2 h-2 rounded-full bg-emerald-300 animate-ping" />
             </span>
           </div>
         </div>

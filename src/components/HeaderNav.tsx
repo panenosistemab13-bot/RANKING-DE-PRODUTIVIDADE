@@ -8,7 +8,6 @@ interface HeaderNavProps {
   periodLabel: string;
   siteLabel: string;
   totalOperatorsCount?: number;
-  onOpenDataModal: () => void;
   activeView?: 'showcase' | 'list';
   onToggleView?: (view: 'showcase' | 'list') => void;
 }
@@ -19,7 +18,6 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({
   periodLabel,
   siteLabel,
   totalOperatorsCount = 0,
-  onOpenDataModal,
   activeView = 'showcase',
   onToggleView
 }) => {
@@ -111,8 +109,7 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({
         {/* Indicador de Status: Planilha Oficial Vinculada em Tempo Real */}
         <div
           title="Planilha Oficial Google Sheets vinculada e sincronizada em tempo real via Firebase"
-          className="flex items-center gap-2.5 px-3.5 py-2 rounded-2xl bg-emerald-500/10 border border-emerald-300/80 shadow-xs text-emerald-950 backdrop-blur-md cursor-pointer hover:bg-emerald-500/15 transition-all"
-          onClick={onOpenDataModal}
+          className="flex items-center gap-2.5 px-3.5 py-2 rounded-2xl bg-emerald-500/10 border border-emerald-300/80 shadow-xs text-emerald-950 backdrop-blur-md select-none"
         >
           <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white shadow-xs">
             <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 fill-white">

@@ -234,8 +234,9 @@ export async function buscarRankingRealtime(): Promise<FirebaseRankingData | nul
     const snapshot = await get(rankingRef);
     if (snapshot.exists()) {
       const val = snapshot.val() as any;
-      if (val && val.operators) {
-        const normalizedOps = normalizarOperadoresFirebase(val.operators);
+      if (val) {
+        const rawOps = val.operators ?? [];
+        const normalizedOps = normalizarOperadoresFirebase(rawOps);
         const dataObj: FirebaseRankingData = {
           ...val,
           operators: normalizedOps
@@ -275,8 +276,9 @@ export function ouvirRankingRealtime(
     (snapshot) => {
       if (snapshot.exists()) {
         const val = snapshot.val() as any;
-        if (val && val.operators) {
-          const normalizedOps = normalizarOperadoresFirebase(val.operators);
+        if (val) {
+          const rawOps = val.operators ?? [];
+          const normalizedOps = normalizarOperadoresFirebase(rawOps);
           const dataObj: FirebaseRankingData = {
             ...val,
             operators: normalizedOps
