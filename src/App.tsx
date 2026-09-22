@@ -5,6 +5,7 @@ import { LayerPodium3D } from './components/LayerPodium3D';
 import { LayerResumoGeral } from './components/LayerResumoGeral';
 import { LayerRankingTable } from './components/LayerRankingTable';
 import { LayerCinematicShowcase } from './components/LayerCinematicShowcase';
+import { LoginScreen } from './components/LoginScreen';
 import { EMPTY_OPERATORS, EMPTY_KPIS } from './data/productivityData';
 import { OperatorSummary, DashboardKPIs, PeriodPreset } from './types';
 import { ouvirRankingRealtime, carregarCacheLocal, salvarRankingRealtime, app } from './services/firebase';
@@ -67,6 +68,27 @@ function formatarFrasePeriodo(label: string | null | undefined, operators: Opera
 }
 
 export default function App() {
+  // Autenticação de Usuário e Controle de Sessão
+  const [userEmail, setUserEmail] = useState<string | null>(() => {
+    return localStorage.getItem('saga_logged_user_email') || 'panenosistemab13@gmail.com';
+  });
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    const saved = localStorage.getItem('saga_logged_user_email');
+    return saved !== null && saved !== '';
+  });
+
+  const handleLogin = (email: string) => {
+    setUserEmail(email);
+    setIsAuthenticated(true);
+    localStorage.setItem('saga_logged_user_email', email);
+  };
+
+  const handleLogout = () => {
+    setUserEmail(null);
+    setIsAuthenticated(false);
+    localStorage.removeItem('saga_logged_user_email');
+  };
+
   const [periodPreset, setPeriodPreset] = useState<PeriodPreset>('reference');
   const [viewMode, setViewMode] = useState<'showcase' | 'list'>('showcase');
   const [selectedActivity, setSelectedActivity] = useState<string>('TODAS AS ATIVIDADES');
@@ -315,6 +337,15 @@ export default function App() {
     });
   };
 
+  if (!isAuthenticated) {
+    return (
+      <LoginScreen
+        onLogin={handleLogin}
+        defaultEmail={userEmail || 'panenosistemab13@gmail.com'}
+      />
+    );
+  }
+
   return (
     <div className="app-viewport select-none">
       {/* 
@@ -345,6 +376,8 @@ export default function App() {
                 totalOperatorsCount={rawActiveOperators.length}
                 activeView={viewMode}
                 onToggleView={setViewMode}
+                userEmail={userEmail}
+                onLogout={handleLogout}
               />
 
               {/* =========================================================================

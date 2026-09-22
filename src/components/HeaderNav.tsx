@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, MapPin, SlidersHorizontal, Monitor, Trophy, TableProperties, Maximize, Minimize } from 'lucide-react';
+import { Calendar, MapPin, SlidersHorizontal, Monitor, Trophy, TableProperties, Maximize, Minimize, LogOut, User } from 'lucide-react';
 import { PeriodPreset } from '../types';
 
 interface HeaderNavProps {
@@ -10,6 +10,8 @@ interface HeaderNavProps {
   totalOperatorsCount?: number;
   activeView?: 'showcase' | 'list';
   onToggleView?: (view: 'showcase' | 'list') => void;
+  userEmail?: string | null;
+  onLogout?: () => void;
 }
 
 export const HeaderNav: React.FC<HeaderNavProps> = ({
@@ -19,7 +21,9 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({
   siteLabel,
   totalOperatorsCount = 0,
   activeView = 'showcase',
-  onToggleView
+  onToggleView,
+  userEmail,
+  onLogout
 }) => {
   const [showPeriodDropdown, setShowPeriodDropdown] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -177,6 +181,33 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({
             </div>
           </button>
         </div>
+
+        {/* User Account & Logout Button */}
+        {userEmail && onLogout && (
+          <div className="flex items-center gap-2 pl-2 border-l border-slate-200/80">
+            <div className="flex items-center gap-2.5 px-3.5 py-1.5 rounded-2xl bg-white/95 border border-slate-200/90 shadow-xs">
+              <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-slate-800 to-slate-900 flex items-center justify-center text-amber-400 font-black text-xs shadow-xs">
+                {userEmail.charAt(0).toUpperCase()}
+              </div>
+              <div className="text-left leading-tight max-w-[130px] truncate hidden sm:block">
+                <span className="block text-[9px] font-extrabold text-slate-400 uppercase tracking-wider">
+                  Usuário SAGA
+                </span>
+                <span className="text-[11.5px] font-black text-slate-800 tracking-tight truncate block" title={userEmail}>
+                  {userEmail}
+                </span>
+              </div>
+              <button
+                onClick={onLogout}
+                title="Deslogar e Voltar para Tela de Login"
+                className="ml-1 px-2.5 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-500 text-rose-600 hover:text-white transition-all duration-200 cursor-pointer border border-rose-200/80 hover:border-rose-600 flex items-center gap-1.5 group shadow-xs hover:shadow-md"
+              >
+                <LogOut className="w-3.5 h-3.5 group-hover:-translate-x-0.5 transition-transform" />
+                <span className="text-[10.5px] font-black uppercase font-heading">Sair</span>
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </header>
   );
