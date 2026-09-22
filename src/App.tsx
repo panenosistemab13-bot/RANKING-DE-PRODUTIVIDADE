@@ -1,12 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { getAuth, onAuthStateChanged, User } from 'firebase/auth';
 import { LayerBackground } from './components/LayerBackground';
 import { HeaderNav } from './components/HeaderNav';
 import { LayerPodium3D } from './components/LayerPodium3D';
 import { LayerResumoGeral } from './components/LayerResumoGeral';
 import { LayerRankingTable } from './components/LayerRankingTable';
 import { LayerCinematicShowcase } from './components/LayerCinematicShowcase';
-import { LoginModal } from './components/LoginModal';
 import { EMPTY_OPERATORS, EMPTY_KPIS } from './data/productivityData';
 import { OperatorSummary, DashboardKPIs, PeriodPreset } from './types';
 import { ouvirRankingRealtime, carregarCacheLocal, salvarRankingRealtime, app } from './services/firebase';
@@ -69,8 +67,6 @@ function formatarFrasePeriodo(label: string | null | undefined, operators: Opera
 }
 
 export default function App() {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
   const [periodPreset, setPeriodPreset] = useState<PeriodPreset>('reference');
   const [viewMode, setViewMode] = useState<'showcase' | 'list'>('showcase');
   const [selectedActivity, setSelectedActivity] = useState<string>('TODAS AS ATIVIDADES');
@@ -90,16 +86,6 @@ export default function App() {
     return null;
   });
   const [isFirebaseConnected, setIsFirebaseConnected] = useState<boolean>(true);
-
-  // Auth listener
-  useEffect(() => {
-    const auth = getAuth(app);
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      setLoading(false);
-    });
-    return unsubscribe;
-  }, []);
 
   // Listen to Firebase Realtime Database in real time
   useEffect(() => {
@@ -345,33 +331,25 @@ export default function App() {
 
   return (
     <div className="app-viewport select-none">
-      {loading ? (
-        <div className="flex items-center justify-center min-h-screen bg-[#05091B] text-white">
-          <div className="animate-pulse">Carregando SAGA...</div>
-        </div>
-      ) : !user ? (
-        <LoginModal onLoginSuccess={setUser} />
-      ) : (
-        <>
-          {/* 
-            Uniformly scaled 1920x1080 presentation canvas preserving exact typography and circle proportions
-          */}
-          <div
-            className="dashboard-canvas flex flex-row"
-            style={{
-              transform: `scale(${scale})`,
-              transition: 'transform 0.1s ease-out'
-            }}
-          >
-            {/* =========================================================
-                CAMADA 1 — FUNDO CINEMATOGRÁFICO
-               ========================================================= */}
-            <LayerBackground />
+      {/* 
+        Uniformly scaled 1920x1080 presentation canvas preserving exact typography and circle proportions
+      */}
+      <div
+        className="dashboard-canvas flex flex-row"
+        style={{
+          transform: `scale(${scale})`,
+          transition: 'transform 0.1s ease-out'
+        }}
+      >
+        {/* =========================================================
+            CAMADA 1 — FUNDO CINEMATOGRÁFICO
+           ========================================================= */}
+        <LayerBackground />
 
-            {/* =========================================================
-                ÁREA PRINCIPAL DO DASHBOARD (1920px x 1080px)
-               ========================================================= */}
-            <main className="flex-1 h-full flex flex-col justify-between px-8 py-4 relative z-10">
+        {/* =========================================================
+            ÁREA PRINCIPAL DO DASHBOARD (1920px x 1080px)
+           ========================================================= */}
+        <main className="flex-1 h-full flex flex-col justify-between px-8 py-4 relative z-10">
               {/* TOPO: Cabeçalho com Título, Período, Site, Marca e Alternador de Modo */}
               <HeaderNav
                 periodPreset={periodPreset}
@@ -460,8 +438,6 @@ export default function App() {
               )}
             </main>
           </div>
-        </>
-      )}
     </div>
   );
 }
