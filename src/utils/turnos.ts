@@ -131,7 +131,7 @@ export function salvarTurnoCustomizado(nome: string, turno: string): void {
     const mapa = carregarTurnosCustomizados();
     const norm = normalizarNomeParaBusca(nome);
     mapa[norm] = turno;
-    mapa[nome.trim().toUpperCase()] = turno;
+    mapa[(nome || "").trim().toUpperCase()] = turno;
     localStorage.setItem(LOCAL_STORAGE_KEY_TURNOS_CUSTOM, JSON.stringify(mapa));
     MAPA_NORMALIZADO.set(norm, turno);
   } catch (e) {
@@ -152,8 +152,8 @@ export function obterTurnoColaborador(nome?: string): string {
   if (customMap[norm]) {
     return customMap[norm];
   }
-  if (customMap[nome.trim().toUpperCase()]) {
-    return customMap[nome.trim().toUpperCase()];
+  if (customMap[(nome || "").trim().toUpperCase()]) {
+    return customMap[(nome || "").trim().toUpperCase()];
   }
 
   // 1. Busca exata direta

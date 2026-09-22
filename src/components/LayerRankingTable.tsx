@@ -56,7 +56,7 @@ export const LayerRankingTable: React.FC<LayerRankingTableProps> = ({
     };
 
     operators.forEach((op) => {
-      const t = (op.turno || obterTurnoColaborador(op.name)).toUpperCase();
+      const t = (op?.turno || obterTurnoColaborador(op?.name || "") || "").toUpperCase();
       if (counts[t] !== undefined) {
         counts[t]++;
       } else {
@@ -99,7 +99,7 @@ export const LayerRankingTable: React.FC<LayerRankingTableProps> = ({
       }
       if (op.activitiesMetrics) {
         Object.keys(op.activitiesMetrics).forEach((act) => {
-          foundSet.add(act.toUpperCase().replace(/_/g, '/').trim());
+          foundSet.add((act || "").toUpperCase().replace(/_/g, '/').trim());
         });
       }
     });
@@ -107,7 +107,7 @@ export const LayerRankingTable: React.FC<LayerRankingTableProps> = ({
     standard.forEach((s) => foundSet.add(s));
 
     foundSet.forEach((item) => {
-      if (item && item.toUpperCase() !== 'TODAS AS ATIVIDADES') {
+      if (item && (item || "").toUpperCase() !== 'TODAS AS ATIVIDADES') {
         list.push(item);
       }
     });
@@ -256,7 +256,7 @@ export const LayerRankingTable: React.FC<LayerRankingTableProps> = ({
     if (activeTurno && activeTurno !== 'TODOS' && activeTurno !== 'TODOS OS TURNOS') {
       resultado = resultado.filter((c) => {
         const t = c.turno || obterTurnoColaborador(c.name);
-        return t.toUpperCase() === activeTurno.toUpperCase();
+        return (t || "").toUpperCase() === (activeTurno || "").toUpperCase();
       });
     }
 
@@ -266,23 +266,24 @@ export const LayerRankingTable: React.FC<LayerRankingTableProps> = ({
     }
 
     // 4. Ordenação
-    if (sortBy === 'produtividade') {
-      resultado.sort((a, b) => {
-        if (b.totalProductivity !== a.totalProductivity) {
-          return b.totalProductivity - a.totalProductivity;
-        }
-        return a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' });
-      });
-    } else if (sortBy === 'movimentacoes') {
-      resultado.sort((a, b) => {
-        if (b.movements !== a.movements) {
-          return b.movements - a.movements;
-        }
-        return a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' });
-      });
-    } else if (sortBy === 'nome') {
-      resultado.sort((a, b) => a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' }));
-    }
+    const rankingOrdenado = Array.isArray(resultado)
+      ? [...resultado].sort((a, b) => {
+          if (sortBy === 'produtividade') {
+            const prodA = a?.totalProductivity || 0;
+            const prodB = b?.totalProductivity || 0;
+            if (prodB !== prodA) return prodB - prodA;
+          } else if (sortBy === 'movimentacoes') {
+            const movA = a?.movements || 0;
+            const movB = b?.movements || 0;
+            if (movB !== movA) return movB - movA;
+          }
+
+          const nomeA = String(a?.name || "");
+          const nomeB = String(b?.name || "");
+          return nomeA.localeCompare(nomeB, 'pt-BR', { sensitivity: 'base' });
+        })
+      : [];
+    resultado = rankingOrdenado;
 
     // 5. Recalcula posições e percentuais
     const totalProdFiltrado = resultado.reduce((s, c) => s + c.totalProductivity, 0);
@@ -521,7 +522,7 @@ export const LayerRankingTable: React.FC<LayerRankingTableProps> = ({
 
                   <div className="grid grid-cols-3 gap-1.5 mt-1">
                     {TURNOS_DISPONIVEIS.map((t) => {
-                      const isSel = activeTurno.toUpperCase() === t.id.toUpperCase();
+                      const isSel = (activeTurno || "").toUpperCase() === (t?.id || "").toUpperCase();
                       const count = turnoCounts[t.id] ?? 0;
                       return (
                         <button
@@ -614,7 +615,7 @@ export const LayerRankingTable: React.FC<LayerRankingTableProps> = ({
           </span>
           <div className="flex items-center gap-1 bg-white p-0.5 rounded-xl border border-slate-200/80">
             {TURNOS_DISPONIVEIS.map((t) => {
-              const isSelected = activeTurno.toUpperCase() === t.id.toUpperCase();
+              const isSelected = (activeTurno || "").toUpperCase() === (t?.id || "").toUpperCase();
               const count = turnoCounts[t.id] ?? 0;
               return (
                 <button
@@ -857,7 +858,7 @@ export const LayerRankingTable: React.FC<LayerRankingTableProps> = ({
         currentTurno={editingTurnoOperator?.currentTurno}
         allOperators={operators}
         onSelectOperator={(name) => {
-          const found = operators.find((o) => o.name.toUpperCase() === name.toUpperCase());
+          const found = operators.find((o) => (o?.name || "").toUpperCase() === (name || "").toUpperCase());
           setEditingTurnoOperator({
             name,
             currentTurno: found?.turno || obterTurnoColaborador(name)

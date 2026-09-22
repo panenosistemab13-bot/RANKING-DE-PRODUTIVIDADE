@@ -105,7 +105,7 @@ export function filtrarRanking(
   if (turno && turno !== "TODOS" && turno !== "TODOS OS TURNOS") {
     baseColaboradores = baseColaboradores.filter((c) => {
       const colabTurno = c.turno || obterTurnoColaborador(c.nome);
-      return colabTurno.toUpperCase() === turno.toUpperCase();
+      return (colabTurno || "").toUpperCase() === (turno || "").toUpperCase();
     });
   }
 
@@ -602,10 +602,14 @@ export async function lerRankingProdutividade(
   ======================================================= */
 
   colaboradores.sort((a, b) => {
-    if (b.qtdOrdens !== a.qtdOrdens) {
-      return b.qtdOrdens - a.qtdOrdens;
+    const ordensA = a?.qtdOrdens || 0;
+    const ordensB = b?.qtdOrdens || 0;
+    if (ordensB !== ordensA) {
+      return ordensB - ordensA;
     }
-    return a.nome.localeCompare(b.nome, "pt-BR", { sensitivity: "base" });
+    const nomeA = String(a?.nome || "");
+    const nomeB = String(b?.nome || "");
+    return nomeA.localeCompare(nomeB, "pt-BR", { sensitivity: "base" });
   });
 
   const totalOrdens = colaboradores.reduce(
@@ -885,12 +889,12 @@ export async function lerRankingUMA(
       }
       if (idxEmployeeCode === -1) continue;
 
-      const funcionarioNome = tokens.slice(idxEmployeeCode + 1, idxDate).join(" ").trim().toUpperCase();
+      const funcionarioNome = (tokens.slice(idxEmployeeCode + 1, idxDate).join(" ") || "").trim().toUpperCase();
       if (!funcionarioNome) continue;
 
       // REQUISITO CRÍTICO DE DEDUPLICAÇÃO DE UMA:
       // Se o mesmo código de "UMA ORIGEM" aparecer mais de uma vez para o mesmo funcionário, desconsidere.
-      const keyCombo = `${funcionarioNome}|${umaOrigem.toUpperCase().trim()}`;
+      const keyCombo = `${funcionarioNome}|${(umaOrigem || "").toUpperCase().trim()}`;
       if (uniqueEmployeeUmas.has(keyCombo)) {
         continue;
       }
@@ -1002,10 +1006,14 @@ export async function lerRankingUMA(
 
   // Ordenação decrescente por produtividade (Qtd. Ordens)
   colaboradores.sort((a, b) => {
-    if (b.qtdOrdens !== a.qtdOrdens) {
-      return b.qtdOrdens - a.qtdOrdens;
+    const ordensA = a?.qtdOrdens || 0;
+    const ordensB = b?.qtdOrdens || 0;
+    if (ordensB !== ordensA) {
+      return ordensB - ordensA;
     }
-    return a.nome.localeCompare(b.nome, "pt-BR", { sensitivity: "base" });
+    const nomeA = String(a?.nome || "");
+    const nomeB = String(b?.nome || "");
+    return nomeA.localeCompare(nomeB, "pt-BR", { sensitivity: "base" });
   });
 
   const totalOrdens = colaboradores.reduce((soma, c) => soma + c.qtdOrdens, 0);
@@ -1062,7 +1070,11 @@ export async function lerRankingUMA(
   // Extrai período e intervalo de datas
   const arrayDatas = Array.from(new Set(registros.map(r => r.data)))
     .filter(d => parseDataBRTimestamp(d) > 0)
-    .sort((a, b) => parseDataBRTimestamp(a) - parseDataBRTimestamp(b));
+    .sort((a, b) => {
+      const tA = parseDataBRTimestamp(a) || 0;
+      const tB = parseDataBRTimestamp(b) || 0;
+      return tA - tB;
+    });
 
   const dataInicio = arrayDatas[0] || "02/01/2026";
   const dataFim = arrayDatas[arrayDatas.length - 1] || "20/09/2026";

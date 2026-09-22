@@ -138,7 +138,11 @@ export const LayerCinematicShowcase: React.FC<LayerCinematicShowcaseProps> = ({
   const activities = currentOperator?.activitiesCount
     ? Object.entries(currentOperator.activitiesCount)
         .filter(([_, count]) => count > 0)
-        .sort((a, b) => b[1] - a[1])
+        .sort((a, b) => {
+          const valA = a?.[1] || 0;
+          const valB = b?.[1] || 0;
+          return valB - valA;
+        })
     : [];
 
   const maxActivityVal = activities.length > 0 ? Math.max(...activities.map((a) => a[1])) : 1;
@@ -221,7 +225,7 @@ export const LayerCinematicShowcase: React.FC<LayerCinematicShowcaseProps> = ({
               Turno:
             </span>
             {['TODOS', 'A', 'B', 'C', 'ADM', 'RANDS'].map((t) => {
-              const isSel = (selectedTurno || 'TODOS').toUpperCase() === t.toUpperCase();
+              const isSel = (selectedTurno || 'TODOS').toUpperCase() === (t || "").toUpperCase();
               return (
                 <button
                   key={t}
@@ -646,7 +650,7 @@ export const LayerCinematicShowcase: React.FC<LayerCinematicShowcaseProps> = ({
         currentTurno={currentOperator?.turno}
         allOperators={operators}
         onSelectOperator={(name) => {
-          const idx = operators.findIndex((o) => o.name.toUpperCase() === name.toUpperCase());
+          const idx = operators.findIndex((o) => (o?.name || "").toUpperCase() === (name || "").toUpperCase());
           if (idx !== -1) setCurrentIndex(idx);
         }}
         onSaveTurno={(name, newTurno) => {

@@ -53,7 +53,11 @@ function formatarFrasePeriodo(label: string | null | undefined, operators: Opera
 
   const list = Array.from(datasSet).filter((d) => parseDataBRTimestamp(d) > 0);
   if (list.length > 0) {
-    list.sort((a, b) => parseDataBRTimestamp(a) - parseDataBRTimestamp(b));
+    list.sort((a, b) => {
+      const tA = parseDataBRTimestamp(a) || 0;
+      const tB = parseDataBRTimestamp(b) || 0;
+      return tA - tB;
+    });
     const dInicio = list[0];
     const dFim = list[list.length - 1];
     return `início do período ${dInicio} ao fim do período ${dFim}`;
@@ -138,8 +142,8 @@ export default function App() {
     let list = rawActiveOperators;
     if (selectedTurno && selectedTurno !== 'TODOS' && selectedTurno !== 'TODOS OS TURNOS') {
       list = list.filter((op) => {
-        const t = op.turno || obterTurnoColaborador(op.name);
-        return t.toUpperCase() === selectedTurno.toUpperCase();
+        const t = op.turno || obterTurnoColaborador(op.name) || "";
+        return t.toUpperCase() === (selectedTurno || "").toUpperCase();
       });
     }
 
@@ -189,10 +193,13 @@ export default function App() {
 
     // Ordenação decrescente por produtividade (Qtd. Ordens)
     const sorted = [...list].sort((a, b) => {
-      if (b.totalProductivity !== a.totalProductivity) {
-        return b.totalProductivity - a.totalProductivity;
-      }
-      return a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' });
+      const prodA = a?.totalProductivity || 0;
+      const prodB = b?.totalProductivity || 0;
+      if (prodB !== prodA) return prodB - prodA;
+      
+      const nomeA = String(a?.name || "");
+      const nomeB = String(b?.name || "");
+      return nomeA.localeCompare(nomeB, 'pt-BR', { sensitivity: 'base' });
     });
 
     const totalSubsetProd = sorted.reduce((sum, c) => sum + c.totalProductivity, 0);
@@ -299,7 +306,7 @@ export default function App() {
     // 2. Atualiza a lista ativa de operadores no estado React
     const currentList = customOperators ? [...customOperators] : [...rawActiveOperators];
     const updated = currentList.map((op) => {
-      if (op.name.toUpperCase() === operatorName.toUpperCase()) {
+      if ((op.name || "").toUpperCase() === (operatorName || "").toUpperCase()) {
         return {
           ...op,
           turno: newTurno

@@ -77,7 +77,7 @@ export const DataImportExportModal: React.FC<DataImportExportModalProps> = ({
       const activitiesMap: Record<string, number> = {};
       const colabRows = (colab.registrosDetalhados && colab.registrosDetalhados.length > 0)
         ? colab.registrosDetalhados
-        : result.linhas.filter(l => l.colaborador.toUpperCase() === colab.nome.toUpperCase());
+        : result.linhas.filter(l => (l?.colaborador || "").toUpperCase() === (colab?.nome || "").toUpperCase());
 
       colabRows.forEach(l => {
         activitiesMap[l.atividade] = (activitiesMap[l.atividade] || 0) + (l.qtdOrdens || 0);
@@ -272,7 +272,7 @@ export const DataImportExportModal: React.FC<DataImportExportModalProps> = ({
             const turnoIdentificado = obterTurnoColaborador(name);
             parsed.push({
               rank: idx + 1,
-              name: name.toUpperCase(),
+              name: (name || "").toUpperCase(),
               turno: turnoIdentificado,
               totalProductivity: prod,
               movements: mov || 20,
@@ -291,18 +291,27 @@ export const DataImportExportModal: React.FC<DataImportExportModalProps> = ({
         return;
       }
 
-      // Sort and recalculate participation - NO .slice(0, 25) limit!
-      parsed.sort((a, b) => b.totalProductivity - a.totalProductivity);
-      const totalProd = parsed.reduce((acc, curr) => acc + curr.totalProductivity, 0) || 1;
+      // Sort and recalculate participation
+      parsed.sort((a, b) => {
+        const prodA = a?.totalProductivity || 0;
+        const prodB = b?.totalProductivity || 0;
+        return prodB - prodA;
+      });
+      const totalProd = parsed.reduce((acc, curr) => acc + (curr?.totalProductivity || 0), 0) || 1;
       parsed.forEach((op, i) => {
+        if (!op) return;
         op.rank = i + 1;
-        op.participation = +((op.totalProductivity / totalProd) * 100).toFixed(2);
+        op.participation = +(( (op?.totalProductivity || 0) / totalProd) * 100).toFixed(2);
       });
 
       // Extrai datas do texto se existirem
       const datasEncontradas = Array.from(new Set(pasteText.match(/\b\d{2}\/\d{2}\/\d{4}\b/g) || []))
         .filter(d => parseDataBRTimestamp(d) > 0)
-        .sort((a, b) => parseDataBRTimestamp(a) - parseDataBRTimestamp(b));
+        .sort((a, b) => {
+          const tA = parseDataBRTimestamp(a) || 0;
+          const tB = parseDataBRTimestamp(b) || 0;
+          return tA - tB;
+        });
 
       const dInicio = datasEncontradas[0] || "02/01/2026";
       const dFim = datasEncontradas[datasEncontradas.length - 1] || "20/09/2026";
@@ -528,7 +537,7 @@ export const DataImportExportModal: React.FC<DataImportExportModalProps> = ({
                   <div className="flex items-center justify-between p-4 bg-slate-50 border border-slate-200 rounded-2xl">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-full bg-amber-500 text-white font-black text-sm flex items-center justify-center shadow-inner">
-                        {gUser.email?.[0]?.toUpperCase() || 'G'}
+                        {gUser?.email ? gUser.email[0]?.toUpperCase() : 'G'}
                       </div>
                       <div>
                         <p className="text-xs text-slate-500 font-medium animate-pulse">Conectado como</p>

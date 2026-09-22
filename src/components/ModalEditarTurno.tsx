@@ -44,13 +44,13 @@ export const ModalEditarTurno: React.FC<ModalEditarTurnoProps> = ({
 
   // Encontra dados do colaborador selecionado
   const currentOp = useMemo(() => {
-    return allOperators.find((op) => op.name.toUpperCase() === selectedName.toUpperCase());
+    return allOperators.find((op) => (op?.name || "").toUpperCase() === (selectedName || "").toUpperCase());
   }, [allOperators, selectedName]);
 
   const activeTurno = useMemo(() => {
     if (currentOp?.turno) return currentOp.turno.toUpperCase();
-    if (currentTurno && selectedName === operatorName) return currentTurno.toUpperCase();
-    return obterTurnoColaborador(selectedName).toUpperCase();
+    if (currentTurno && selectedName === operatorName) return (currentTurno || "").toUpperCase();
+    return (obterTurnoColaborador(selectedName || "") || "").toUpperCase();
   }, [currentOp, currentTurno, selectedName, operatorName]);
 
   // Lista de colaboradores filtrada para busca rápida
@@ -158,7 +158,7 @@ export const ModalEditarTurno: React.FC<ModalEditarTurnoProps> = ({
             <div className="grid grid-cols-2 gap-2.5">
               {OPCOES_TURNO.map((t) => {
                 const style = obterEstiloVisualTurno(t.id);
-                const isCurrent = activeTurno === t.id.toUpperCase();
+                const isCurrent = (activeTurno || "").toUpperCase() === (t?.id || "").toUpperCase();
 
                 return (
                   <button
@@ -218,7 +218,7 @@ export const ModalEditarTurno: React.FC<ModalEditarTurnoProps> = ({
                   {filteredOperatorsList.map((op) => {
                     const opTurno = op.turno || obterTurnoColaborador(op.name);
                     const opStyle = obterEstiloVisualTurno(opTurno);
-                    const isSelected = op.name.toUpperCase() === selectedName.toUpperCase();
+                    const isSelected = (op?.name || "").toUpperCase() === (selectedName || "").toUpperCase();
 
                     return (
                       <button

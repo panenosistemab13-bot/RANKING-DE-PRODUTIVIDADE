@@ -123,7 +123,7 @@ export async function importarRankingDeSheets(
     throw new Error('Nenhum dado encontrado ou a planilha está vazia.');
   }
 
-  const headers = rows[0].map(h => String(h || '').toUpperCase().trim());
+  const headers = rows[0].map(h => (String(h || '') || "").toUpperCase().trim());
   
   // Detecta se é a planilha SAGA bruta (com FUNCIONARIO na coluna Y/24 e UMA ORIGEM na coluna H/7)
   const idxFuncionario = headers.findIndex(h => h === 'FUNCIONARIO' || h === 'FUNCIONÁRIO');
@@ -139,8 +139,8 @@ export async function importarRankingDeSheets(
     for (let i = 1; i < rows.length; i++) {
       const row = rows[i];
       if (!row) continue;
-      const funcionario = row[finalIdxFunc]?.trim()?.toUpperCase();
-      const uma = row[finalIdxUma]?.trim()?.toUpperCase();
+      const funcionario = (row[finalIdxFunc] || "").trim().toUpperCase();
+      const uma = (row[finalIdxUma] || "").trim().toUpperCase();
 
       if (funcionario && uma) {
         if (!rankingMap[funcionario]) {
@@ -167,7 +167,11 @@ export async function importarRankingDeSheets(
     });
 
     // Ordena do maior para o menor
-    parsedOperators.sort((a, b) => b.totalProductivity - a.totalProductivity);
+    parsedOperators.sort((a, b) => {
+      const prodA = a?.totalProductivity || 0;
+      const prodB = b?.totalProductivity || 0;
+      return prodB - prodA;
+    });
 
     // Ajusta as posições de rank
     parsedOperators.forEach((op, idx) => {
@@ -206,7 +210,7 @@ export async function importarRankingDeSheets(
 
     parsedOperators.push({
       rank: i,
-      name: name.toUpperCase().trim(),
+      name: (name || "").toUpperCase().trim(),
       turno: turno || 'A',
       totalProductivity: prod,
       movements: mov || 20,
@@ -238,7 +242,7 @@ function parseDefaultRows(rows: string[][]): OperatorSummary[] {
 
     parsedOperators.push({
       rank: i,
-      name: name.toUpperCase().trim(),
+      name: (name || "").toUpperCase().trim(),
       turno: 'A',
       totalProductivity: prod,
       movements: mov || 20,
