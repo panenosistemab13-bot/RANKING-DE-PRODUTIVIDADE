@@ -560,7 +560,7 @@ export const LayerRankingTable: React.FC<LayerRankingTableProps> = ({
             >
               <Filter className="w-3.5 h-3.5" />
               <span className="uppercase tracking-wide font-heading">
-                {selectedActivity !== 'TODAS AS ATIVIDADES' ? selectedActivity : 'CONF VOLUME'}
+                {selectedActivity}
               </span>
               <ChevronDown className="w-3 h-3 ml-0.5" />
             </button>
