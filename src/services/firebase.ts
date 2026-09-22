@@ -151,6 +151,42 @@ export function carregarCacheLocal(): { operators: OperatorSummary[]; label: str
 }
 
 /**
+ * Salva a URL do Web App do Google Apps Script no Firebase e LocalStorage
+ */
+export async function salvarWebAppUrl(url: string): Promise<void> {
+  try {
+    localStorage.setItem('saga_web_app_url', url);
+    const urlRef = ref(rtdb, "config/webAppUrl");
+    await set(urlRef, url);
+    console.log("[Firebase RTDB] URL do WebApp salva:", url);
+  } catch (err) {
+    console.warn("[Firebase RTDB] Erro ao salvar URL do WebApp:", err);
+  }
+}
+
+/**
+ * Obtém a URL do Web App do Google Apps Script
+ */
+export async function obterWebAppUrl(): Promise<string | null> {
+  try {
+    const cached = localStorage.getItem('saga_web_app_url');
+    if (cached) return cached;
+    const urlRef = ref(rtdb, "config/webAppUrl");
+    const snapshot = await get(urlRef);
+    if (snapshot.exists()) {
+      const val = snapshot.val();
+      if (typeof val === 'string') {
+        localStorage.setItem('saga_web_app_url', val);
+        return val;
+      }
+    }
+  } catch (err) {
+    console.warn("[Firebase RTDB] Erro ao buscar URL do WebApp:", err);
+  }
+  return null;
+}
+
+/**
  * Limpa todos os dados de ranking do Firebase Realtime Database e LocalStorage
  */
 export async function limparRankingRealtime(): Promise<void> {
