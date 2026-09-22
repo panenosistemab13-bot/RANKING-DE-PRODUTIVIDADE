@@ -6,9 +6,11 @@ import { LayerResumoGeral } from './components/LayerResumoGeral';
 import { LayerRankingTable } from './components/LayerRankingTable';
 import { LayerCinematicShowcase } from './components/LayerCinematicShowcase';
 import { DataImportExportModal } from './components/DataImportExportModal';
+import { LoginModal } from './components/LoginModal';
 import { EMPTY_OPERATORS, EMPTY_KPIS } from './data/productivityData';
 import { OperatorSummary, DashboardKPIs, PeriodPreset } from './types';
 import { ouvirRankingRealtime, carregarCacheLocal, salvarRankingRealtime } from './services/firebase';
+import { getCurrentUser } from './services/googleAuth';
 import { normalizarAtividade, parseDataBRTimestamp } from './utils/rankingPdfParser';
 import { obterTurnoColaborador, salvarTurnoCustomizado } from './utils/turnos';
 
@@ -68,6 +70,7 @@ function formatarFrasePeriodo(label: string | null | undefined, operators: Opera
 }
 
 export default function App() {
+  const [user, setUser] = useState(getCurrentUser());
   const [periodPreset, setPeriodPreset] = useState<PeriodPreset>('reference');
   const [viewMode, setViewMode] = useState<'showcase' | 'list'>('showcase');
   const [selectedActivity, setSelectedActivity] = useState<string>('TODAS AS ATIVIDADES');
@@ -330,126 +333,132 @@ export default function App() {
 
   return (
     <div className="app-viewport select-none">
-      {/* 
-        Uniformly scaled 1920x1080 presentation canvas preserving exact typography and circle proportions
-      */}
-      <div
-        className="dashboard-canvas flex flex-row"
-        style={{
-          transform: `scale(${scale})`,
-          transition: 'transform 0.1s ease-out'
-        }}
-      >
-        {/* =========================================================
-            CAMADA 1 — FUNDO CINEMATOGRÁFICO
-           ========================================================= */}
-        <LayerBackground />
+      {!user ? (
+        <LoginModal onLoginSuccess={setUser} />
+      ) : (
+        <>
+          {/* 
+            Uniformly scaled 1920x1080 presentation canvas preserving exact typography and circle proportions
+          */}
+          <div
+            className="dashboard-canvas flex flex-row"
+            style={{
+              transform: `scale(${scale})`,
+              transition: 'transform 0.1s ease-out'
+            }}
+          >
+            {/* =========================================================
+                CAMADA 1 — FUNDO CINEMATOGRÁFICO
+               ========================================================= */}
+            <LayerBackground />
 
-        {/* =========================================================
-            ÁREA PRINCIPAL DO DASHBOARD (1920px x 1080px)
-           ========================================================= */}
-        <main className="flex-1 h-full flex flex-col justify-between px-8 py-4 relative z-10">
-          {/* TOPO: Cabeçalho com Título, Período, Site, Marca e Alternador de Modo */}
-          <HeaderNav
+            {/* =========================================================
+                ÁREA PRINCIPAL DO DASHBOARD (1920px x 1080px)
+               ========================================================= */}
+            <main className="flex-1 h-full flex flex-col justify-between px-8 py-4 relative z-10">
+              {/* TOPO: Cabeçalho com Título, Período, Site, Marca e Alternador de Modo */}
+              <HeaderNav
+                periodPreset={periodPreset}
+                onSelectPeriodPreset={handleSelectPeriodPreset}
+                periodLabel={currentKPIs.periodLabel}
+                siteLabel={currentKPIs.siteLabel}
+                totalOperatorsCount={rawActiveOperators.length}
+                onOpenDataModal={() => setIsDataModalOpen(true)}
+                activeView={viewMode}
+                onToggleView={setViewMode}
+              />
+
+              {/* =========================================================================
+                  MODO 1: APRESENTAÇÃO 3D 4K CINEMATOGRÁFICA ISOLADA (PADRÃO AO ENTRAR)
+                 ========================================================================= */}
+              {viewMode === 'showcase' ? (
+                <section className="w-full flex-1 flex items-center justify-center">
+                  <LayerCinematicShowcase
+                    operators={filteredActiveOperators}
+                    kpis={currentKPIs}
+                    onSwitchToListMode={() => setViewMode('list')}
+                    onSelectOperator={setSelectedOperator}
+                    initialOperatorName={selectedOperator}
+                    selectedTurno={selectedTurno}
+                    onSelectTurno={setSelectedTurno}
+                    onUpdateOperatorTurno={handleUpdateOperatorTurno}
+                  />
+                </section>
+              ) : (
+                /* =========================================================================
+                    MODO 2: MODO LISTA COMPLETA COM VISÃO GERAL E TABELA DE 69 COLABORADORES
+                   ========================================================================= */
+                <div className="w-full flex-1 flex flex-col justify-between">
+                  {/* TOPO DO MODO LISTA: Pódio 3D Centralizado + Resumos SAGA */}
+                  <section className="w-full flex items-center justify-between gap-5 px-3">
+                    {/* Asa Esquerda: Métricas Gerais Consolidadas SAGA */}
+                    <div className="w-[440px] shrink-0">
+                      <LayerResumoGeral
+                        variant="left"
+                        kpis={currentKPIs}
+                        onFilterActivity={setSelectedActivity}
+                        onOpenImportPDF={() => setIsDataModalOpen(true)}
+                      />
+                    </div>
+
+                    {/* CENTRO: Mini Pódio 3D em Destaque */}
+                    <div className="flex-1 max-w-[940px] flex justify-center">
+                      <LayerPodium3D
+                        firstPlace={top1}
+                        secondPlace={top2}
+                        thirdPlace={top3}
+                        onSelectOperator={(opName) => {
+                          setSelectedOperator(opName);
+                          setViewMode('showcase');
+                        }}
+                        selectedOperator={selectedOperator}
+                      />
+                    </div>
+
+                    {/* Asa Direita: Indicadores de Performance & Gestão de Relatórios SAGA */}
+                    <div className="w-[440px] shrink-0">
+                      <LayerResumoGeral
+                        variant="right"
+                        kpis={currentKPIs}
+                        onFilterActivity={setSelectedActivity}
+                        onOpenImportPDF={() => setIsDataModalOpen(true)}
+                      />
+                    </div>
+                  </section>
+
+                  {/* TABELA COMPLETA COM OS 69 COLABORADORES */}
+                  <section className="w-full px-3 mt-3">
+                    <LayerRankingTable
+                      operators={rawActiveOperators}
+                      selectedActivity={selectedActivity}
+                      onSelectActivity={setSelectedActivity}
+                      selectedTurno={selectedTurno}
+                      onSelectTurno={setSelectedTurno}
+                      onSelectOperator={setSelectedOperator}
+                      selectedOperator={selectedOperator}
+                      onOpenShowcase={(opName) => {
+                        if (opName) setSelectedOperator(opName);
+                        setViewMode('showcase');
+                      }}
+                      onUpdateOperatorTurno={handleUpdateOperatorTurno}
+                    />
+                  </section>
+                </div>
+              )}
+            </main>
+          </div>
+
+          {/* MODAL DE IMPORTAÇÃO/EXPORTAÇÃO DE DADOS */}
+          <DataImportExportModal
+            isOpen={isDataModalOpen}
+            onClose={() => setIsDataModalOpen(false)}
+            operators={rawActiveOperators}
             periodPreset={periodPreset}
             onSelectPeriodPreset={handleSelectPeriodPreset}
-            periodLabel={currentKPIs.periodLabel}
-            siteLabel={currentKPIs.siteLabel}
-            totalOperatorsCount={rawActiveOperators.length}
-            onOpenDataModal={() => setIsDataModalOpen(true)}
-            activeView={viewMode}
-            onToggleView={setViewMode}
+            onImportCustomData={handleImportCustomData}
           />
-
-          {/* =========================================================================
-              MODO 1: APRESENTAÇÃO 3D 4K CINEMATOGRÁFICA ISOLADA (PADRÃO AO ENTRAR)
-             ========================================================================= */}
-          {viewMode === 'showcase' ? (
-            <section className="w-full flex-1 flex items-center justify-center">
-              <LayerCinematicShowcase
-                operators={filteredActiveOperators}
-                kpis={currentKPIs}
-                onSwitchToListMode={() => setViewMode('list')}
-                onSelectOperator={setSelectedOperator}
-                initialOperatorName={selectedOperator}
-                selectedTurno={selectedTurno}
-                onSelectTurno={setSelectedTurno}
-                onUpdateOperatorTurno={handleUpdateOperatorTurno}
-              />
-            </section>
-          ) : (
-            /* =========================================================================
-                MODO 2: MODO LISTA COMPLETA COM VISÃO GERAL E TABELA DE 69 COLABORADORES
-               ========================================================================= */
-            <div className="w-full flex-1 flex flex-col justify-between">
-              {/* TOPO DO MODO LISTA: Pódio 3D Centralizado + Resumos SAGA */}
-              <section className="w-full flex items-center justify-between gap-5 px-3">
-                {/* Asa Esquerda: Métricas Gerais Consolidadas SAGA */}
-                <div className="w-[440px] shrink-0">
-                  <LayerResumoGeral
-                    variant="left"
-                    kpis={currentKPIs}
-                    onFilterActivity={setSelectedActivity}
-                    onOpenImportPDF={() => setIsDataModalOpen(true)}
-                  />
-                </div>
-
-                {/* CENTRO: Mini Pódio 3D em Destaque */}
-                <div className="flex-1 max-w-[940px] flex justify-center">
-                  <LayerPodium3D
-                    firstPlace={top1}
-                    secondPlace={top2}
-                    thirdPlace={top3}
-                    onSelectOperator={(opName) => {
-                      setSelectedOperator(opName);
-                      setViewMode('showcase');
-                    }}
-                    selectedOperator={selectedOperator}
-                  />
-                </div>
-
-                {/* Asa Direita: Indicadores de Performance & Gestão de Relatórios SAGA */}
-                <div className="w-[440px] shrink-0">
-                  <LayerResumoGeral
-                    variant="right"
-                    kpis={currentKPIs}
-                    onFilterActivity={setSelectedActivity}
-                    onOpenImportPDF={() => setIsDataModalOpen(true)}
-                  />
-                </div>
-              </section>
-
-              {/* TABELA COMPLETA COM OS 69 COLABORADORES */}
-              <section className="w-full px-3 mt-3">
-                <LayerRankingTable
-                  operators={rawActiveOperators}
-                  selectedActivity={selectedActivity}
-                  onSelectActivity={setSelectedActivity}
-                  selectedTurno={selectedTurno}
-                  onSelectTurno={setSelectedTurno}
-                  onSelectOperator={setSelectedOperator}
-                  selectedOperator={selectedOperator}
-                  onOpenShowcase={(opName) => {
-                    if (opName) setSelectedOperator(opName);
-                    setViewMode('showcase');
-                  }}
-                  onUpdateOperatorTurno={handleUpdateOperatorTurno}
-                />
-              </section>
-            </div>
-          )}
-        </main>
-      </div>
-
-      {/* MODAL DE IMPORTAÇÃO/EXPORTAÇÃO DE DADOS */}
-      <DataImportExportModal
-        isOpen={isDataModalOpen}
-        onClose={() => setIsDataModalOpen(false)}
-        operators={rawActiveOperators}
-        periodPreset={periodPreset}
-        onSelectPeriodPreset={handleSelectPeriodPreset}
-        onImportCustomData={handleImportCustomData}
-      />
+        </>
+      )}
     </div>
   );
 }
