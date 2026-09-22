@@ -107,7 +107,7 @@ export default function App() {
   useEffect(() => {
     const unsubscribe = ouvirRankingRealtime(
       (data) => {
-        if (data && data.operators && data.operators.length > 0) {
+        if (data && data.operators) {
           console.log("[Firebase Realtime Database] Dados recebidos em tempo real:", data);
           setCustomOperators(data.operators);
           setCustomLabel(formatarFrasePeriodo(data.label, data.operators));

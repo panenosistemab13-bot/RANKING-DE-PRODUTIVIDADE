@@ -92,11 +92,13 @@ export async function exportarRankingParaSheets(
   return spreadsheetId;
 }
 
+export const FIXED_SPREADSHEET_ID = '1synVKAYxOm4dRUXEuw65u0Lv1erLF7-9PXeAUtSd-QA';
+
 /**
  * Busca os dados de uma planilha existente do Google Sheets e converte para OperatorSummary[]
  */
 export async function importarRankingDeSheets(
-  spreadsheetId: string,
+  spreadsheetId = FIXED_SPREADSHEET_ID,
   rangeName = 'PRODUTIVIDADE!A:Z'
 ): Promise<OperatorSummary[]> {
   const token = await getAccessToken();
@@ -104,16 +106,28 @@ export async function importarRankingDeSheets(
     throw new Error('Usuário não autenticado no Google');
   }
 
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${rangeName}`;
-  const response = await fetch(url, {
+  const effectiveId = spreadsheetId || FIXED_SPREADSHEET_ID;
+  let url = `https://sheets.googleapis.com/v4/spreadsheets/${effectiveId}/values/${encodeURIComponent(rangeName)}`;
+  let response = await fetch(url, {
     headers: {
       'Authorization': `Bearer ${token}`,
     },
   });
 
+  // Se a aba específica não for encontrada, tenta ler a primeira aba (A:Z)
   if (!response.ok) {
-    const errText = await response.text();
-    throw new Error(`Erro ao carregar dados da planilha: ${errText}`);
+    const fallbackUrl = `https://sheets.googleapis.com/v4/spreadsheets/${effectiveId}/values/A:Z`;
+    const fallbackResponse = await fetch(fallbackUrl, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+    if (fallbackResponse.ok) {
+      response = fallbackResponse;
+    } else {
+      const errText = await response.text();
+      throw new Error(`Erro ao carregar dados da planilha: ${errText}`);
+    }
   }
 
   const data = await response.json();

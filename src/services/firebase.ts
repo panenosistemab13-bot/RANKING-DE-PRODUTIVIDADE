@@ -162,6 +162,70 @@ export async function limparRankingRealtime(): Promise<void> {
 }
 
 /**
+ * Normaliza os operadores recebidos do Firebase Realtime Database
+ * Aceita tanto Array quanto Dicionário de objetos e mapeia formatos legados ou automáticos
+ */
+export function normalizarOperadoresFirebase(rawOperators: any): OperatorSummary[] {
+  if (!rawOperators) return [];
+  const list = Array.isArray(rawOperators) ? rawOperators : Object.values(rawOperators);
+  if (!Array.isArray(list)) return [];
+
+  return list
+    .filter((item) => item && typeof item === 'object')
+    .map((item: any, idx: number) => {
+      const name = String(
+        item.name ||
+        item.colaborador ||
+        item.COLABORADOR ||
+        item.funcionario ||
+        item.FUNCIONARIO ||
+        item.FUNCIONÁRIO ||
+        item.nome ||
+        item.NOME ||
+        `Colaborador ${idx + 1}`
+      ).trim().toUpperCase();
+
+      const rawProd = item.totalProductivity ?? item.produtividade ?? item.PRODUTIVIDADE ?? item.ordens ?? item.ORDENS ?? item.quantidade ?? item.QUANTIDADE ?? item.movements ?? 0;
+      const prod = typeof rawProd === 'number' ? rawProd : (parseInt(String(rawProd).replace(/\D/g, ''), 10) || 0);
+
+      const rawMov = item.movements ?? item.movimentacoes ?? item.MOVIMENTACOES ?? item.pecas ?? prod;
+      const mov = typeof rawMov === 'number' ? rawMov : (parseInt(String(rawMov).replace(/\D/g, ''), 10) || prod);
+
+      const rank = Number(item.rank ?? (idx + 1)) || (idx + 1);
+      const turno = item.turno || item.TURNO || 'A';
+      const topActivity = item.topActivity || 'MOVIMENTAÇÃO UMA';
+      const activitiesCount = item.activitiesCount || { [topActivity]: prod };
+      const sparkline = Array.isArray(item.sparkline) && item.sparkline.length > 0
+        ? item.sparkline
+        : [prod * 0.7, prod * 0.8, prod * 0.75, prod * 0.85, prod * 0.9, prod];
+
+      return {
+        rank,
+        name,
+        turno,
+        totalProductivity: prod,
+        movements: mov,
+        participation: Number(item.participation || 0),
+        trendGrowth: Number(item.trendGrowth || 8.5),
+        sparkline,
+        topActivity,
+        activitiesCount,
+        dataInicio: item.dataInicio,
+        dataFim: item.dataFim,
+        datas: item.datas,
+        qtdOrdens: item.qtdOrdens,
+        qtdPecas: item.qtdPecas,
+        qtdLotes: item.qtdLotes,
+        qtdServ: item.qtdServ,
+        qtdItens: item.qtdItens,
+        qtdEnd: item.qtdEnd,
+        registros: item.registros,
+        registrosDetalhados: item.registrosDetalhados
+      } as OperatorSummary;
+    });
+}
+
+/**
  * Busca os dados atuais do Firebase uma vez de forma direta
  */
 export async function buscarRankingRealtime(): Promise<FirebaseRankingData | null> {
@@ -169,14 +233,19 @@ export async function buscarRankingRealtime(): Promise<FirebaseRankingData | nul
     const rankingRef = ref(rtdb, "ranking_atual");
     const snapshot = await get(rankingRef);
     if (snapshot.exists()) {
-      const val = snapshot.val() as FirebaseRankingData;
-      if (val && val.operators && val.operators.length > 0) {
+      const val = snapshot.val() as any;
+      if (val && val.operators) {
+        const normalizedOps = normalizarOperadoresFirebase(val.operators);
+        const dataObj: FirebaseRankingData = {
+          ...val,
+          operators: normalizedOps
+        };
         // Atualiza cache local
         try {
-          localStorage.setItem(LOCAL_STORAGE_KEY_OPERATORS, JSON.stringify(val.operators));
-          localStorage.setItem(LOCAL_STORAGE_KEY_LABEL, val.label);
+          localStorage.setItem(LOCAL_STORAGE_KEY_OPERATORS, JSON.stringify(normalizedOps));
+          localStorage.setItem(LOCAL_STORAGE_KEY_LABEL, val.label || "Planilha Google Oficial");
         } catch {}
-        return val;
+        return dataObj;
       }
     }
   } catch (e) {
@@ -205,14 +274,19 @@ export function ouvirRankingRealtime(
     rankingRef,
     (snapshot) => {
       if (snapshot.exists()) {
-        const val = snapshot.val() as FirebaseRankingData;
-        if (val && val.operators && val.operators.length > 0) {
+        const val = snapshot.val() as any;
+        if (val && val.operators) {
+          const normalizedOps = normalizarOperadoresFirebase(val.operators);
+          const dataObj: FirebaseRankingData = {
+            ...val,
+            operators: normalizedOps
+          };
           // Atualiza cache local
           try {
-            localStorage.setItem(LOCAL_STORAGE_KEY_OPERATORS, JSON.stringify(val.operators));
-            localStorage.setItem(LOCAL_STORAGE_KEY_LABEL, val.label);
+            localStorage.setItem(LOCAL_STORAGE_KEY_OPERATORS, JSON.stringify(normalizedOps));
+            localStorage.setItem(LOCAL_STORAGE_KEY_LABEL, val.label || "Planilha Google Oficial");
           } catch {}
-          onData(val);
+          onData(dataObj);
         }
       } else {
         onData(null);

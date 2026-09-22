@@ -32,9 +32,12 @@ export const DataImportExportModal: React.FC<DataImportExportModalProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const fileInputUmaRef = useRef<HTMLInputElement>(null);
 
+  // ID da planilha fixa
+  const FIXED_SPREADSHEET_ID = "1synVKAYxOm4dRUXEuw65u0Lv1erLF7-9PXeAUtSd-QA";
+  
   // Estados do Google Sheets
   const [gUser, setGUser] = useState<any>(null);
-  const [spreadsheetUrl, setSpreadsheetUrl] = useState('');
+  const [spreadsheetUrl, setSpreadsheetUrl] = useState(FIXED_SPREADSHEET_ID);
   const [isProcessingSheets, setIsProcessingSheets] = useState(false);
   const [createdSheetUrl, setCreatedSheetUrl] = useState<string | null>(null);
 
@@ -383,25 +386,25 @@ export const DataImportExportModal: React.FC<DataImportExportModalProps> = ({
     }
   };
 
-  const handleImportFromSheets = async () => {
-    if (!spreadsheetUrl.trim()) {
+  const handleImportFromSheets = async (targetId?: string) => {
+    const rawTarget = (targetId || spreadsheetUrl || FIXED_SPREADSHEET_ID).trim();
+    if (!rawTarget) {
       setImportStatus("Por favor, insira o link ou o ID da planilha do Google Sheets.");
       return;
     }
     setIsProcessingSheets(true);
-    setImportStatus("Conectando à planilha e importando dados...");
+    setImportStatus("Conectando à planilha fixa e importando dados...");
     try {
-      const id = extrairSpreadsheetId(spreadsheetUrl.trim());
+      const id = extrairSpreadsheetId(rawTarget);
       const parsed = await importarRankingDeSheets(id);
       
-      const label = `importado via Google Sheets em ${new Date().toLocaleDateString('pt-BR')}`;
+      const label = `importado da Planilha Oficial em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
       onImportCustomData(parsed, label);
       
       // Salva no Firebase RTDB
       await salvarRankingRealtime(parsed, label, "02/01/2026", "20/09/2026");
       
-      setImportStatus(`Sucesso! ${parsed.length} colaboradores importados da planilha e sincronizados.`);
-      setSpreadsheetUrl('');
+      setImportStatus(`Sucesso! ${parsed.length} colaboradores importados da planilha fixa e sincronizados.`);
       setTimeout(() => {
         onClose();
       }, 1500);
@@ -526,39 +529,47 @@ export const DataImportExportModal: React.FC<DataImportExportModalProps> = ({
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {/* Seção Importar */}
                     <div className="p-5 border border-slate-150 rounded-2xl bg-white space-y-3 flex flex-col justify-between">
-                      <div className="space-y-3">
-                        <h4 className="text-sm font-black text-slate-900 flex items-center gap-2">
-                          <UploadCloud className="w-4 h-4 text-amber-500" />
-                          Importar de Planilha
-                        </h4>
+                      <div className="space-y-2.5">
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-sm font-black text-slate-900 flex items-center gap-2">
+                            <UploadCloud className="w-4 h-4 text-amber-500" />
+                            Planilha Oficial Vinculada
+                          </h4>
+                          <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full text-[10px] font-black uppercase tracking-wider">
+                            Vínculo Fixo
+                          </span>
+                        </div>
                         <p className="text-xs text-slate-500 font-medium leading-relaxed">
-                          Insira o ID ou link de uma planilha Google Sheets de sua conta. O cabeçalho deve possuir uma coluna que contenha "Colaborador" ou "Nome", e outra com "Produtividade".
+                          A planilha oficial está permanentemente configurada. Os usuários não precisam informar ou conectar o ID manualmente.
                         </p>
+                        <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-[11px] font-mono text-slate-700 flex items-center justify-between gap-2">
+                          <span className="truncate max-w-[200px]" title={FIXED_SPREADSHEET_ID}>{FIXED_SPREADSHEET_ID}</span>
+                          <a
+                            href={`https://docs.google.com/spreadsheets/d/${FIXED_SPREADSHEET_ID}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-amber-600 hover:text-amber-700 font-bold shrink-0 underline text-xs flex items-center gap-1"
+                          >
+                            Abrir Planilha ↗
+                          </a>
+                        </div>
                       </div>
                       <div className="space-y-2 pt-1">
-                        <input
-                          type="text"
-                          placeholder="1biozb1pXF_vvISoxkeajsEr_z7prU3EkYQKZf79ja5k"
-                          value={spreadsheetUrl}
-                          onChange={(e) => setSpreadsheetUrl(e.target.value)}
-                          disabled={isProcessingSheets}
-                          className="w-full p-2.5 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500 text-slate-800 bg-white"
-                        />
                         <button
                           type="button"
-                          onClick={handleImportFromSheets}
+                          onClick={() => handleImportFromSheets(FIXED_SPREADSHEET_ID)}
                           disabled={isProcessingSheets}
-                          className="w-full py-2.5 bg-amber-500 hover:bg-amber-600 disabled:bg-slate-200 text-white disabled:text-slate-400 rounded-xl text-xs font-bold shadow-sm flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                          className="w-full py-2.5 bg-amber-500 hover:bg-amber-600 disabled:bg-slate-200 text-white disabled:text-slate-400 rounded-xl text-xs font-bold shadow-md shadow-amber-500/20 flex items-center justify-center gap-2 transition-colors cursor-pointer"
                         >
                           {isProcessingSheets ? (
                             <>
                               <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                              Processando...
+                              Sincronizando com a Planilha Fixa...
                             </>
                           ) : (
                             <>
-                              <Database className="w-3.5 h-3.5" />
-                              Importar Planilha
+                              <RefreshCw className="w-3.5 h-3.5" />
+                              Sincronizar Planilha Fixa Agora
                             </>
                           )}
                         </button>

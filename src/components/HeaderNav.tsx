@@ -108,27 +108,32 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({
           </div>
         </div>
 
-        {/* Botão de Banco de Dados / Firebase */}
-        <button
+        {/* Indicador de Status: Planilha Oficial Vinculada em Tempo Real */}
+        <div
+          title="Planilha Oficial Google Sheets vinculada e sincronizada em tempo real via Firebase"
+          className="flex items-center gap-2.5 px-3.5 py-2 rounded-2xl bg-emerald-500/10 border border-emerald-300/80 shadow-xs text-emerald-950 backdrop-blur-md cursor-pointer hover:bg-emerald-500/15 transition-all"
           onClick={onOpenDataModal}
-          title="Banco de Dados Firebase Realtime • Importar PDF"
-          className="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-900 border border-amber-300/80 shadow-xs hover:shadow-md transition-all duration-200 cursor-pointer group"
         >
-          <div className="w-7 h-7 rounded-xl bg-amber-500 flex items-center justify-center text-white shadow-xs group-hover:scale-105 transition-transform">
-            <SlidersHorizontal className="w-3.5 h-3.5" />
+          <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white shadow-xs">
+            <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 fill-white">
+              <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/>
+            </svg>
           </div>
           <div className="text-left leading-tight hidden lg:block">
             <div className="flex items-center gap-1.5">
-              <span className="text-[11.5px] font-black text-amber-900 tracking-tight uppercase font-heading">
-                Firebase Realtime
+              <span className="text-[11.5px] font-black text-emerald-900 tracking-tight uppercase font-heading">
+                Planilha Vinculada
               </span>
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
             </div>
-            <span className="block text-[9.5px] font-bold text-amber-700 uppercase tracking-wider">
-              Importar / Sincronizar
+            <span className="block text-[9.5px] font-bold text-emerald-700 uppercase tracking-wider">
+              Tempo Real Automático
             </span>
           </div>
-        </button>
+        </div>
 
         {/* Slogan with Heart Logo */}
         <div className="flex items-center gap-2.5 pl-2 select-none">
