@@ -64,7 +64,7 @@ export const DataImportExportModal: React.FC<DataImportExportModalProps> = ({
     try {
       await limparRankingRealtime();
       onImportCustomData([], "Nenhum dado importado");
-      setImportStatus("Todas as informações de teste e dados foram limpos com sucesso!");
+      setImportStatus("Dados limpos com sucesso.");
     } catch (e) {
       setImportStatus("Erro ao limpar dados.");
     }
@@ -441,38 +441,8 @@ export const DataImportExportModal: React.FC<DataImportExportModalProps> = ({
 
         {/* Tab Navigation */}
         <div className="px-8 pt-4 flex gap-2 border-b border-slate-100 bg-slate-50/70">
-          <button
-            type="button"
-            onClick={() => {
-              setActiveTab('SAGA');
-              setPdfResult(null);
-              setImportStatus(null);
-            }}
-            className={`pb-3 px-4 text-xs font-bold border-b-2 flex items-center gap-2 cursor-pointer transition-colors ${
-              activeTab === 'SAGA'
-                ? 'border-amber-500 text-amber-600 font-black'
-                : 'border-transparent text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            <FileText className="w-4 h-4" />
-            Importar Produtividade SAGA
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setActiveTab('UMA');
-              setPdfResult(null);
-              setImportStatus(null);
-            }}
-            className={`pb-3 px-4 text-xs font-bold border-b-2 flex items-center gap-2 cursor-pointer transition-colors ${
-              activeTab === 'UMA'
-                ? 'border-amber-500 text-amber-600 font-black'
-                : 'border-transparent text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            <FileSpreadsheet className="w-4 h-4" />
-            Importar U.M.A. (PDF para Excel)
-          </button>
+          {/* SAGA button removed */}
+          {/* UMA button removed */}
           <button
             type="button"
             onClick={() => {
