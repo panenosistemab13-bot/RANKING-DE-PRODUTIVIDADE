@@ -18,12 +18,25 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
     <aside className="w-[84px] h-full flex flex-col items-center py-6 border-r border-white/40 bg-white/40 backdrop-blur-xl z-20 shrink-0 select-none">
       {/* 3 Corações Brand Logo */}
       <div className="flex flex-col items-center mb-8 group cursor-pointer" onClick={() => onSelectTab('ranking')}>
-        <img
-          src="/src/assets/images/tres_coracoes_badge_1790081482199.jpg"
-          alt="3 Corações Badge 3D"
-          referrerPolicy="no-referrer"
-          className="w-14 h-14 object-cover rounded-2xl shadow-lg border-2 border-amber-400/80 group-hover:scale-110 transition-transform duration-200"
-        />
+        <div className="relative w-14 h-14 rounded-2xl bg-gradient-to-br from-red-600 via-orange-600 to-amber-500 shadow-lg border-2 border-amber-400/80 flex items-center justify-center shrink-0 overflow-hidden group-hover:scale-110 transition-transform duration-200">
+          <img
+            src="/tres_coracoes_badge.jpg"
+            alt="3 Corações Badge 3D"
+            referrerPolicy="no-referrer"
+            className="w-full h-full object-cover"
+            onError={(e) => {
+              (e.target as HTMLElement).style.display = 'none';
+            }}
+          />
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none -z-10">
+            <svg viewBox="0 0 24 24" className="w-8 h-8 fill-white drop-shadow">
+              <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+            </svg>
+            <div className="absolute bottom-1 right-1 w-4 h-4 rounded-full bg-amber-400 border border-white flex items-center justify-center text-[9px] font-black text-slate-900">
+              3
+            </div>
+          </div>
+        </div>
         <span className="text-[11px] font-black tracking-tight text-slate-900 mt-2 leading-none uppercase">
           3 Corações
         </span>

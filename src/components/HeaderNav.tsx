@@ -58,12 +58,27 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({
       <div className="flex items-center gap-5">
         {/* Logo Oficial 3 Corações 4K 3D */}
         <div className="flex items-center gap-3.5 pr-6 border-r border-slate-300/80">
-          <img
-            src="/src/assets/images/tres_coracoes_badge_1790081482199.jpg"
-            alt="Ícone 3D 3 Corações"
-            referrerPolicy="no-referrer"
-            className="w-14 h-14 object-cover rounded-2xl shadow-xl shadow-orange-600/20 border-2 border-amber-400/80 hover:scale-105 transition-all shrink-0"
-          />
+          <div className="relative w-14 h-14 rounded-2xl bg-gradient-to-br from-red-600 via-orange-600 to-amber-500 shadow-xl shadow-orange-600/25 border-2 border-amber-400/80 flex items-center justify-center shrink-0 overflow-hidden group">
+            <img
+              src="/tres_coracoes_badge.jpg"
+              alt="3 Corações Logo 3D"
+              referrerPolicy="no-referrer"
+              className="w-full h-full object-cover transition-transform group-hover:scale-105"
+              onError={(e) => {
+                // Fallback to vector 3D heart icon if image fails
+                (e.target as HTMLElement).style.display = 'none';
+              }}
+            />
+            {/* Fallback Vector 3D Heart (hidden if image loads successfully) */}
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none -z-10">
+              <svg viewBox="0 0 24 24" className="w-8 h-8 fill-white drop-shadow-md">
+                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+              </svg>
+              <div className="absolute bottom-1 right-1 w-4 h-4 rounded-full bg-amber-400 border border-white flex items-center justify-center text-[9px] font-black text-slate-900 shadow-xs">
+                3
+              </div>
+            </div>
+          </div>
           <div className="flex flex-col justify-center">
             <span className="text-[22px] font-black text-[#0f2444] leading-none tracking-tight font-heading uppercase drop-shadow-xs">
               3 CORAÇÕES
