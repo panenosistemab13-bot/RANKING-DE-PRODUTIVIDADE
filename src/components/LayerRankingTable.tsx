@@ -482,19 +482,19 @@ export const LayerRankingTable: React.FC<LayerRankingTableProps> = ({
           <div className="flex items-center gap-3">
             <h3 className="text-[21px] font-black tracking-tight text-[#0f2444] uppercase font-heading drop-shadow-xs flex items-center gap-2">
               RANKING COMPLETO
-              <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-slate-900 text-amber-400 tracking-widest border border-slate-800">
+              <span className="text-[10px] font-black px-3 py-1 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 text-white tracking-wider uppercase shadow-xs">
                 PRODUTIVIDADE SAGA (QTD. ORDENS)
               </span>
             </h3>
 
             {/* Badge de Atividade Ativa com Botão X para Limpar */}
             {selectedActivity !== 'TODAS AS ATIVIDADES' && (
-              <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 text-white font-extrabold text-xs shadow-md shadow-amber-500/25 uppercase tracking-wide border border-amber-300">
+              <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-100 text-amber-950 font-extrabold text-xs shadow-xs uppercase tracking-wide border border-amber-300">
                 <span>{selectedActivity}</span>
                 <button
                   onClick={() => onSelectActivity('TODAS AS ATIVIDADES')}
                   title="Remover filtro de atividade"
-                  className="w-4 h-4 rounded-full bg-white/20 hover:bg-white/40 flex items-center justify-center transition-colors cursor-pointer ml-1"
+                  className="w-4 h-4 rounded-full bg-amber-200/80 hover:bg-amber-300 flex items-center justify-center transition-colors cursor-pointer ml-1"
                 >
                   <X className="w-2.5 h-2.5" />
                 </button>
@@ -556,15 +556,11 @@ export const LayerRankingTable: React.FC<LayerRankingTableProps> = ({
           <div className="relative">
             <button
               onClick={() => setShowFilterDropdown(!showFilterDropdown)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-bold border shadow-xs transition-all duration-150 cursor-pointer ${
-                isFilterActive
-                  ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white border-amber-400 shadow-md shadow-amber-500/25'
-                  : 'bg-white/90 text-slate-700 border-slate-200/80 hover:bg-white hover:border-slate-300'
-              }`}
+              className="flex items-center gap-2 px-3.5 py-2 rounded-2xl text-xs font-black border shadow-xs transition-all duration-150 cursor-pointer bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white border-amber-400/80"
             >
               <Filter className="w-3.5 h-3.5" />
               <span className="uppercase tracking-wide font-heading">
-                {selectedActivity !== 'TODAS AS ATIVIDADES' ? selectedActivity : 'FILTROS'}
+                {selectedActivity !== 'TODAS AS ATIVIDADES' ? selectedActivity : 'CONF VOLUME'}
               </span>
               <ChevronDown className="w-3 h-3 ml-0.5" />
             </button>
@@ -709,17 +705,18 @@ export const LayerRankingTable: React.FC<LayerRankingTableProps> = ({
           {onOpenShowcase && (
             <button
               onClick={() => onOpenShowcase(selectedOperator || undefined)}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-white font-black text-xs shadow-md shadow-amber-500/30 border border-amber-300/50 transition-all cursor-pointer group"
+              className="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-white font-black text-xs shadow-md shadow-amber-500/30 border border-amber-300/50 transition-all cursor-pointer group"
             >
               <Trophy className="w-3.5 h-3.5 group-hover:rotate-12 transition-transform" />
-              <span>APRESENTAÇÃO 3D (TECLADO ➔)</span>
+              <span>APRESENTAÇÃO 3D (RELOAD)</span>
+              <ChevronDown className="w-3 h-3 ml-0.5" />
             </button>
           )}
 
           {/* Botão de Tela Cheia para o Ranking Completo */}
           <button
             onClick={toggleTableFullscreen}
-            className={`flex items-center gap-2 px-3.5 py-2.5 rounded-2xl font-black text-xs transition-all cursor-pointer shadow-md border ${
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-2xl font-black text-xs transition-all cursor-pointer shadow-md border ${
               isTableFullscreen
                 ? 'bg-rose-600 hover:bg-rose-500 text-white border-rose-400/60 shadow-rose-600/30'
                 : 'bg-slate-900 hover:bg-slate-800 text-amber-400 hover:text-amber-300 border-slate-700 shadow-slate-900/40'
@@ -729,7 +726,7 @@ export const LayerRankingTable: React.FC<LayerRankingTableProps> = ({
             {isTableFullscreen ? (
               <>
                 <Minimize2 className="w-4 h-4 text-rose-200" />
-                <span>SAIR DA TELA CHEIA (ESC)</span>
+                <span>SAIR DA TELA CHEIA</span>
               </>
             ) : (
               <>
@@ -804,7 +801,7 @@ export const LayerRankingTable: React.FC<LayerRankingTableProps> = ({
           </div>
         </div>
 
-        {/* Resumo do Turno Ativo e Botão de Editar Turnos */}
+        {/* Resumo do Turno Ativo */}
         <div className="flex items-center gap-3 text-xs font-bold text-slate-500 pr-1">
           <span>Mostrando: <strong className="text-slate-900">{filteredOperators.length}</strong> de <strong className="text-slate-900">{operators.length}</strong> colaboradores</span>
           {activeTurno !== 'TODOS' && (
@@ -813,18 +810,6 @@ export const LayerRankingTable: React.FC<LayerRankingTableProps> = ({
               className="text-[11px] font-black text-amber-600 hover:text-amber-700 underline cursor-pointer"
             >
               Ver Todos os Turnos
-            </button>
-          )}
-
-          {onUpdateOperatorTurno && (
-            <button
-              type="button"
-              onClick={() => setEditingTurnoOperator({ name: selectedOperator || operators[0]?.name || '', currentTurno: '' })}
-              className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-[11px] uppercase tracking-wider shadow-sm transition-all cursor-pointer hover:shadow-md"
-              title="Clique para editar o turno de qualquer colaborador"
-            >
-              <Edit3 className="w-3 h-3 stroke-[2.5]" />
-              <span>Editar Turnos</span>
             </button>
           )}
         </div>

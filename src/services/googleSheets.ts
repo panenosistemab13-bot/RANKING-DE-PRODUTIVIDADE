@@ -148,7 +148,25 @@ function sincronizarComAppSaga() {
   var ui = SpreadsheetApp.getUi();
 
   try {
-    var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    // SEMPRE busca os dados exclusivamente da aba 'PRODUTIVIDADE'
+    var sheet = ss.getSheetByName('PRODUTIVIDADE');
+    if (!sheet) {
+      // Procura ignorando maiúsculas/minúsculas e espaços
+      var allSheets = ss.getSheets();
+      for (var s = 0; s < allSheets.length; s++) {
+        if (allSheets[s].getName().trim().toUpperCase() === 'PRODUTIVIDADE') {
+          sheet = allSheets[s];
+          break;
+        }
+      }
+    }
+
+    if (!sheet) {
+      if (ui) ui.alert('⚠️ Não foi encontrada a aba com o nome "PRODUTIVIDADE" nesta planilha!\n\nO aplicativo SAGA WMS está configurado para puxar sempre da aba "PRODUTIVIDADE". Por favor, renomeie ou crie a aba "PRODUTIVIDADE".');
+      return;
+    }
+
     var data = sheet.getDataRange().getValues();
 
     if (!data || data.length < 2) {
@@ -444,9 +462,9 @@ export async function importarRankingDeSheets(
     }
   }
 
-  // 2. Tenta via GViz API pública do Google Sheets (não exige OAuth)
+  // 2. Tenta via GViz API pública do Google Sheets (aba PRODUTIVIDADE)
   try {
-    const gvizUrl = `https://docs.google.com/spreadsheets/d/${extractedId}/gviz/tq?tqx=out:json`;
+    const gvizUrl = `https://docs.google.com/spreadsheets/d/${extractedId}/gviz/tq?tqx=out:json&sheet=PRODUTIVIDADE`;
     const gvizRes = await fetch(gvizUrl);
     if (gvizRes.ok) {
       const text = await gvizRes.text();

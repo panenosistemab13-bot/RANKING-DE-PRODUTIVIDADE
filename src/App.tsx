@@ -92,7 +92,7 @@ export default function App() {
   };
 
   const [periodPreset, setPeriodPreset] = useState<PeriodPreset>('reference');
-  const [viewMode, setViewMode] = useState<'showcase' | 'list'>('showcase');
+  const [viewMode, setViewMode] = useState<'showcase' | 'list'>('list');
   const [selectedActivity, setSelectedActivity] = useState<string>('TODAS AS ATIVIDADES');
   const [selectedTurno, setSelectedTurno] = useState<string>('TODOS');
   const [selectedOperator, setSelectedOperator] = useState<string | null>(null);
@@ -439,6 +439,7 @@ export default function App() {
                         operators={rawActiveOperators}
                         selectedActivity={selectedActivity}
                         onFilterActivity={setSelectedActivity}
+                        onOpenGoogleSheetsModal={() => setIsGoogleSheetsModalOpen(true)}
                       />
                     </div>
                   </section>

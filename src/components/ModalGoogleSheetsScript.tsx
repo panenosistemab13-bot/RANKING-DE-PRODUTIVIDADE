@@ -239,27 +239,32 @@ export const ModalGoogleSheetsScript: React.FC<ModalGoogleSheetsScriptProps> = (
 
             {/* Quick Option 2: Script do Apps Script */}
             <div className="p-4 rounded-xl bg-slate-800/50 border border-emerald-500/30 space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div className="flex items-center gap-2 text-emerald-400 font-bold text-sm">
                   <Code2 className="w-4 h-4" />
                   OPÇÃO 2: SCRIPT AUTOMÁTICO PARA O GOOGLE SHEETS (APPS SCRIPT)
                 </div>
-                <button
-                  onClick={handleCopyScript}
-                  className="px-3 py-1.5 rounded-lg bg-emerald-500 text-slate-950 font-black text-xs flex items-center gap-1.5 hover:bg-emerald-400 transition-all shadow-md shadow-emerald-500/20"
-                >
-                  {copied ? (
-                    <>
-                      <Check className="w-3.5 h-3.5" />
-                      Copiado!
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-3.5 h-3.5" />
-                      Copiar Script
-                    </>
-                  )}
-                </button>
+                <div className="flex items-center gap-2">
+                  <span className="px-2.5 py-1 rounded-full bg-blue-500/20 border border-blue-400/40 text-blue-300 font-bold text-[10.5px] uppercase tracking-wider">
+                    Aba de Leitura: PRODUTIVIDADE
+                  </span>
+                  <button
+                    onClick={handleCopyScript}
+                    className="px-3 py-1.5 rounded-lg bg-emerald-500 text-slate-950 font-black text-xs flex items-center gap-1.5 hover:bg-emerald-400 transition-all shadow-md shadow-emerald-500/20"
+                  >
+                    {copied ? (
+                      <>
+                        <Check className="w-3.5 h-3.5" />
+                        Copiado!
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3.5 h-3.5" />
+                        Copiar Script
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
 
               {/* Passo a Passo Visual */}

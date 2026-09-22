@@ -23,6 +23,7 @@ interface LayerResumoGeralProps {
   selectedActivity?: string;
   onFilterActivity?: (activity: string) => void;
   onOpenImportPDF?: () => void;
+  onOpenGoogleSheetsModal?: () => void;
 }
 
 export const LayerResumoGeral: React.FC<LayerResumoGeralProps> = ({
@@ -31,7 +32,8 @@ export const LayerResumoGeral: React.FC<LayerResumoGeralProps> = ({
   operators = [],
   selectedActivity,
   onFilterActivity,
-  onOpenImportPDF
+  onOpenImportPDF,
+  onOpenGoogleSheetsModal
 }) => {
   const formatNumber = (val: number) => {
     return val.toLocaleString('pt-BR');
@@ -83,7 +85,7 @@ export const LayerResumoGeral: React.FC<LayerResumoGeralProps> = ({
   // =========================================================================
   if (variant === 'left') {
     return (
-      <div className="glass-panel w-full h-[410px] p-5.5 flex flex-col justify-between shadow-2xl relative overflow-hidden select-none">
+      <div className="glass-panel w-full h-[395px] p-5 flex flex-col justify-between shadow-xl relative overflow-hidden select-none">
         {/* Top Sheen */}
         <div className="absolute -top-10 -left-10 w-48 h-48 bg-gradient-to-br from-amber-300/15 via-white/40 to-transparent rounded-full blur-xl pointer-events-none" />
 
@@ -97,8 +99,8 @@ export const LayerResumoGeral: React.FC<LayerResumoGeralProps> = ({
               <h2 className="text-[17px] font-black tracking-tight text-[#0f2444] uppercase font-heading leading-tight">
                 MÉTRICAS GERAIS
               </h2>
-              <span className="text-[10px] font-semibold text-slate-500">
-                Consolidado Operacional SAGA
+              <span className="text-[10.5px] font-semibold text-slate-500">
+                Resultados Operacionais SAGA
               </span>
             </div>
           </div>
@@ -186,7 +188,7 @@ export const LayerResumoGeral: React.FC<LayerResumoGeralProps> = ({
             Atividade Principal:
           </span>
           <span className="font-black text-slate-900 uppercase">
-            {kpis.topActivity}
+            {kpis.topActivity} ({formatNumber(kpis.totalProductivity)})
           </span>
         </div>
       </div>
@@ -198,7 +200,7 @@ export const LayerResumoGeral: React.FC<LayerResumoGeralProps> = ({
   // =========================================================================
   if (variant === 'right') {
     return (
-      <div className="glass-panel w-full h-[410px] p-5.5 flex flex-col justify-between shadow-2xl relative overflow-hidden select-none">
+      <div className="glass-panel w-full h-[395px] p-5 flex flex-col justify-between shadow-xl relative overflow-hidden select-none">
         {/* Top Sheen */}
         <div className="absolute -top-10 -right-10 w-48 h-48 bg-gradient-to-br from-amber-300/15 via-white/40 to-transparent rounded-full blur-xl pointer-events-none" />
 
@@ -210,9 +212,9 @@ export const LayerResumoGeral: React.FC<LayerResumoGeralProps> = ({
             </div>
             <div>
               <h2 className="text-[17px] font-black tracking-tight text-[#0f2444] uppercase font-heading leading-tight">
-                INDICADORES & AÇÕES
+                INDICADORES E AÇÕES
               </h2>
-              <span className="text-[10px] font-semibold text-slate-500">
+              <span className="text-[10.5px] font-semibold text-slate-500">
                 Desempenho & Relatórios
               </span>
             </div>
@@ -303,7 +305,17 @@ export const LayerResumoGeral: React.FC<LayerResumoGeralProps> = ({
         )}
 
         {/* STATUS DA PLANILHA GOOGLE EM TEMPO REAL */}
-        <div className="flex items-center justify-center gap-3 px-4 py-3 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 text-white shadow-lg shadow-emerald-700/25 border border-emerald-400/40 select-none">
+        <button
+          type="button"
+          onClick={() => {
+            if (onOpenGoogleSheetsModal) {
+              onOpenGoogleSheetsModal();
+            } else if (onOpenImportPDF) {
+              onOpenImportPDF();
+            }
+          }}
+          className="w-full flex items-center justify-center gap-3 px-4 py-3 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-500 hover:to-teal-600 text-white shadow-lg shadow-emerald-700/25 border border-emerald-400/40 select-none cursor-pointer transition-all hover:scale-[1.01] active:scale-[0.99]"
+        >
           <div className="w-8 h-8 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center text-white shrink-0 shadow-sm">
             <svg viewBox="0 0 24 24" className="w-4.5 h-4.5 fill-white">
               <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/>
@@ -311,14 +323,14 @@ export const LayerResumoGeral: React.FC<LayerResumoGeralProps> = ({
           </div>
           <div className="text-left">
             <span className="block text-[9.5px] font-extrabold text-emerald-100 tracking-wider uppercase leading-tight">
-              PLANILHA GOOGLE INTEGRADA
+              PLANILHA + GOOGLE INTEGRADA
             </span>
             <span className="text-[13px] font-black tracking-tight text-white uppercase font-heading leading-tight flex items-center gap-1.5">
               TEMPO REAL AUTOMÁTICO
               <span className="w-2 h-2 rounded-full bg-emerald-300 animate-ping" />
             </span>
           </div>
-        </div>
+        </button>
       </div>
     );
   }
