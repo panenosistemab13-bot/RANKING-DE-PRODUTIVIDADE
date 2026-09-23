@@ -17,7 +17,7 @@ const DEFAULT_AUTHORIZED_USERS: Record<string, AutorizedUser> = {
   "operacoes": {
     "email": "operacoes@3coracoes.com.br",
     "name": "Operações SAGA",
-    "password": "trescafe2029"
+    "password": "ranking3c26"
   }
 };
 
@@ -38,6 +38,14 @@ export const garantirUsuariosIniciais = async () => {
     if (!snapshot.exists()) {
       await set(dbRef, DEFAULT_AUTHORIZED_USERS);
       console.log('[Auth] Usuários padrão de inicialização criados no Firebase!');
+    } else {
+      // Força a atualização da senha de operacoes no banco para garantir que a alteração seja aplicada imediatamente
+      const opPassRef = ref(rtdb, 'usuarios_autorizados/operacoes/password');
+      await set(opPassRef, 'ranking3c26');
+      
+      // Também atualiza o e-mail e nome se necessário
+      const opEmailRef = ref(rtdb, 'usuarios_autorizados/operacoes/email');
+      await set(opEmailRef, 'operacoes@3coracoes.com.br');
     }
   } catch (err) {
     console.error('[Auth] Erro ao garantir usuários iniciais:', err);
@@ -158,3 +166,10 @@ export const logoutGoogle = async () => {
   sessionStorage.removeItem('saga_oauth_access_token');
   if (authFailureListener) authFailureListener();
 };
+
+/**
+ * Aliases de compatibilidade para o Gmail Send e outros componentes
+ */
+export const googleSignOut = logoutGoogle;
+export const initGoogleAuth = initAuth;
+

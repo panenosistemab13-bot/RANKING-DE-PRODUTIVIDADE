@@ -54,7 +54,7 @@ export const ModalGmailSend: React.FC<ModalGmailSendProps> = ({
     if (!isOpen) return;
     
     const unsubscribe = initGoogleAuth(
-      (user, token) => {
+      (user: any, token: string) => {
         setGoogleUser(user);
         setAccessToken(token);
       },
